@@ -28,9 +28,13 @@ abstract final class Features {
   static bool shopInterior = false;
   static bool upgrades = false;
   static bool achievements = false;
-  static bool shopDecor = false;
 
   // ── Core-supporting aids (kept on) ──────────────────────────────────────
   /// Vibe notebook reference — directly supports the core matching mechanic.
   static bool vibeNotebook = true;
+
+  /// Shop decor / collection — the late-game money sink (Phase 2). Decor gives
+  /// accumulated cash somewhere meaningful to go, so restocking a deep, diverse
+  /// inventory competes with saving toward an aspirational showpiece.
+  static bool shopDecor = true;
 }

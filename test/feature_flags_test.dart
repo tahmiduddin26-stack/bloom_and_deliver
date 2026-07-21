@@ -21,10 +21,10 @@ void main() {
     expect(Features.shopInterior, isFalse, reason: 'shop interior is post-launch');
     expect(Features.upgrades, isFalse, reason: 'upgrades are post-launch');
     expect(Features.achievements, isFalse, reason: 'achievements are post-launch');
-    expect(Features.shopDecor, isFalse, reason: 'shop decor is post-launch');
   });
 
   test('core-supporting aids stay on', () {
     expect(Features.vibeNotebook, isTrue, reason: 'notebook aids the core loop');
+    expect(Features.shopDecor, isTrue, reason: 'decor is the Phase 2 money sink');
   });
 }

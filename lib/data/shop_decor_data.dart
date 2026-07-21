@@ -24,7 +24,7 @@ const ShopDecoration wallpaperLavender = ShopDecoration(
   name: 'Lavender Fields',
   description: 'Soft purple hues that feel like a walk through a lavender farm.',
   category: ShopDecorCategory.wallpaper,
-  cost: 55,
+  cost: 110,
   gradientColors: [
     Color(0xFF3D2A5E),
     Color(0xFF5C4280),
@@ -38,7 +38,7 @@ const ShopDecoration wallpaperSunset = ShopDecoration(
   name: 'Sunset Peach',
   description: 'Warm amber and coral tones, like a golden evening.',
   category: ShopDecorCategory.wallpaper,
-  cost: 60,
+  cost: 190,
   gradientColors: [
     Color(0xFF7A3A1E),
     Color(0xFFA05030),
@@ -52,7 +52,7 @@ const ShopDecoration wallpaperOcean = ShopDecoration(
   name: 'Ocean Mist',
   description: 'Cool teal and blue tones that bring the seaside indoors.',
   category: ShopDecorCategory.wallpaper,
-  cost: 55,
+  cost: 130,
   gradientColors: [
     Color(0xFF1A3D5C),
     Color(0xFF2A5878),
@@ -66,7 +66,7 @@ const ShopDecoration wallpaperRose = ShopDecoration(
   name: 'Rose Petal',
   description: 'Rich dusty-rose tones for a romantic, luxurious feel.',
   category: ShopDecorCategory.wallpaper,
-  cost: 70,
+  cost: 360,
   gradientColors: [
     Color(0xFF5C1E35),
     Color(0xFF7A2E4A),
@@ -96,7 +96,7 @@ const ShopDecoration floorTerracotta = ShopDecoration(
   name: 'Terracotta Tiles',
   description: 'Mediterranean-style terracotta, warm and earthy.',
   category: ShopDecorCategory.floorTile,
-  cost: 40,
+  cost: 100,
   gradientColors: [
     Color(0xFF8B4A2A),
     Color(0xFFA85C35),
@@ -109,7 +109,7 @@ const ShopDecoration floorMarble = ShopDecoration(
   name: 'White Marble',
   description: 'Elegant marble flooring that makes flowers pop.',
   category: ShopDecorCategory.floorTile,
-  cost: 65,
+  cost: 380,
   gradientColors: [
     Color(0xFF9A9A9A),
     Color(0xFFB8B8B8),
@@ -122,7 +122,7 @@ const ShopDecoration floorSlate = ShopDecoration(
   name: 'Slate Blue',
   description: 'Cool charcoal-blue slate for a modern feel.',
   category: ShopDecorCategory.floorTile,
-  cost: 50,
+  cost: 170,
   gradientColors: [
     Color(0xFF2A3A4A),
     Color(0xFF384D60),
@@ -147,7 +147,7 @@ const ShopDecoration counterMarble = ShopDecoration(
   name: 'White Marble',
   description: 'A pristine marble counter — elegance in full bloom.',
   category: ShopDecorCategory.counter,
-  cost: 55,
+  cost: 340,
   accentColor: Color(0xFF8A8A8A),
 );
 
@@ -156,7 +156,7 @@ const ShopDecoration counterWalnut = ShopDecoration(
   name: 'Dark Walnut',
   description: 'Rich dark walnut with a luxurious finish.',
   category: ShopDecorCategory.counter,
-  cost: 45,
+  cost: 210,
   accentColor: Color(0xFF2A1A0E),
 );
 
@@ -165,7 +165,7 @@ const ShopDecoration counterMint = ShopDecoration(
   name: 'Mint Green',
   description: 'A cheerful mint-painted counter, full of life.',
   category: ShopDecorCategory.counter,
-  cost: 50,
+  cost: 110,
   accentColor: Color(0xFF2A6644),
 );
 
@@ -186,7 +186,7 @@ const ShopDecoration plantFern = ShopDecoration(
   name: 'Trailing Fern',
   description: 'A lush fern cascading over the sill.',
   category: ShopDecorCategory.windowPlant,
-  cost: 30,
+  cost: 160,
   decorEmoji: '🌿',
 );
 
@@ -195,7 +195,7 @@ const ShopDecoration plantCactus = ShopDecoration(
   name: 'Desert Cactus',
   description: 'Low-maintenance and full of personality.',
   category: ShopDecorCategory.windowPlant,
-  cost: 25,
+  cost: 70,
   decorEmoji: '🌵',
 );
 
@@ -204,7 +204,7 @@ const ShopDecoration plantBonsai = ShopDecoration(
   name: 'Mini Bonsai',
   description: 'A patient bonsai for a Zen corner.',
   category: ShopDecorCategory.windowPlant,
-  cost: 45,
+  cost: 290,
   decorEmoji: '🌳',
 );
 
@@ -213,7 +213,7 @@ const ShopDecoration plantSunflower = ShopDecoration(
   name: 'Pot Sunflower',
   description: 'A cheerful potted sunflower that brightens the room.',
   category: ShopDecorCategory.windowPlant,
-  cost: 35,
+  cost: 120,
   decorEmoji: '🌻',
 );
 
@@ -234,7 +234,7 @@ const ShopDecoration lightsWarm = ShopDecoration(
   name: 'Warm White',
   description: 'Soft, warm-white fairy lights for a cosy glow.',
   category: ShopDecorCategory.fairyLights,
-  cost: 35,
+  cost: 90,
   decorEmoji: '💡',
 );
 
@@ -243,7 +243,7 @@ const ShopDecoration lightsRainbow = ShopDecoration(
   name: 'Rainbow Lights',
   description: 'Every colour of the rainbow, dancing overhead.',
   category: ShopDecorCategory.fairyLights,
-  cost: 40,
+  cost: 170,
   decorEmoji: '🌈',
 );
 
@@ -252,7 +252,7 @@ const ShopDecoration lightsRose = ShopDecoration(
   name: 'Rose Pink',
   description: "Delicate pink bulb lights, perfect for Valentine's.",
   category: ShopDecorCategory.fairyLights,
-  cost: 35,
+  cost: 120,
   decorEmoji: '🌸',
 );
 
@@ -261,7 +261,7 @@ const ShopDecoration lightsLanterns = ShopDecoration(
   name: 'Paper Lanterns',
   description: 'Hanging lanterns casting a warm, festive glow.',
   category: ShopDecorCategory.fairyLights,
-  cost: 50,
+  cost: 260,
   decorEmoji: '🏮',
 );
 
@@ -282,7 +282,7 @@ const ShopDecoration displaySpring = ShopDecoration(
   name: 'Spring Blooms',
   description: 'A cheerful spring display of tulips and cherry blossoms.',
   category: ShopDecorCategory.windowDisplay,
-  cost: 40,
+  cost: 150,
   decorEmoji: '🌸',
 );
 
@@ -291,7 +291,7 @@ const ShopDecoration displayHarvest = ShopDecoration(
   name: 'Harvest Charm',
   description: 'Wheat sheaves and autumn leaves for a cosy harvest look.',
   category: ShopDecorCategory.windowDisplay,
-  cost: 40,
+  cost: 200,
   decorEmoji: '🍂',
 );
 
@@ -300,7 +300,7 @@ const ShopDecoration displayWinter = ShopDecoration(
   name: 'Winter Scene',
   description: 'Frosted glass and a tiny snowflake wreath.',
   category: ShopDecorCategory.windowDisplay,
-  cost: 45,
+  cost: 300,
   decorEmoji: '❄️',
 );
 
@@ -309,7 +309,7 @@ const ShopDecoration displayRainbow = ShopDecoration(
   name: 'Rainbow Pride',
   description: 'Bright rainbow bunting to welcome everyone.',
   category: ShopDecorCategory.windowDisplay,
-  cost: 35,
+  cost: 100,
   decorEmoji: '🌈',
 );
 
