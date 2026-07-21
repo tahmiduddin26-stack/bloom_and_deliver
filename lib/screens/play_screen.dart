@@ -9,6 +9,7 @@ import '../data/flower_data.dart';
 import '../data/level_data.dart';
 import '../models/bouquet_order.dart';
 import '../models/customer_profile.dart';
+import '../models/daily_challenge.dart';
 import '../models/florist_rank.dart';
 import '../models/flower.dart';
 import '../providers/game_provider.dart';
@@ -46,13 +47,25 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   String? _activeAchievementId;
   String? _activeMemoryKey;
 
+  // Transient "challenge complete" celebration
+  DailyChallenge? _challengeDone;
+
   void _handleSubmit() {
     HapticFeedback.mediumImpact();
     AudioService.instance.play(GameSound.submit);
 
-    final before = ref.read(gameProvider).money;
+    final beforeState = ref.read(gameProvider);
+    final before = beforeState.money;
+    final doneBefore = beforeState.dailyChallenges
+        .where((c) => c.completed)
+        .map((c) => c.id)
+        .toSet();
     final result = ref.read(gameProvider.notifier).submitBouquet();
-    final earned = (ref.read(gameProvider).money - before).clamp(0, 99999);
+    final afterState = ref.read(gameProvider);
+    final earned = (afterState.money - before).clamp(0, 99999);
+    final justCompleted = afterState.dailyChallenges
+        .where((c) => c.completed && !doneBefore.contains(c.id))
+        .toList();
 
     AudioService.instance.play(
       result == OrderResult.great
@@ -70,6 +83,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       _resultShown = result;
       _resultEarned = earned;
       _showConfetti = result == OrderResult.great;
+      if (justCompleted.isNotEmpty) _challengeDone = justCompleted.first;
     });
 
     Future.delayed(const Duration(milliseconds: 1400), () {
@@ -80,6 +94,16 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         });
       }
     });
+
+    if (justCompleted.isNotEmpty) {
+      AudioService.instance.play(GameSound.notification);
+      final completed = justCompleted.first;
+      Future.delayed(const Duration(milliseconds: 3000), () {
+        if (mounted && _challengeDone == completed) {
+          setState(() => _challengeDone = null);
+        }
+      });
+    }
   }
 
   void _openMarket() {
@@ -264,6 +288,14 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                       memoryKey: _activeMemoryKey!,
                       onDismiss: _onMemoryDismissed,
                     ),
+                  ),
+                // Daily-challenge completion celebration
+                if (_challengeDone != null)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: 88,
+                    child: _ChallengeToast(challenge: _challengeDone!),
                   ),
               ],
             ),
@@ -1216,6 +1248,84 @@ class _SubmitBarState extends State<_SubmitBar>
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Daily-challenge completion toast ─────────────────────────────────────────
+
+class _ChallengeToast extends StatelessWidget {
+  final DailyChallenge challenge;
+
+  const _ChallengeToast({required this.challenge});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutBack,
+      builder: (_, t, child) => Opacity(
+        opacity: t.clamp(0.0, 1.0),
+        child: Transform.translate(offset: Offset(0, (1 - t) * 16), child: child),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF66BB6A), Color(0xFF43A047)],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF43A047).withValues(alpha: 0.45),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Text('🎉', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Challenge complete!',
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    challenge.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.nunito(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.92),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '+\$${challenge.reward}',
+              style: GoogleFonts.nunito(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+            ),
+          ],
         ),
       ),
     );
