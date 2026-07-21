@@ -1,0 +1,100 @@
+import '../models/achievement.dart';
+
+const List<Achievement> allAchievements = [
+  Achievement(
+    id: AchievementId.firstBouquet,
+    title: 'First Bloom',
+    description: 'Submit your first bouquet',
+    emoji: '🌸',
+  ),
+  Achievement(
+    id: AchievementId.firstGreat,
+    title: 'Perfect Petals',
+    description: 'Get your first Great rating',
+    emoji: '🌟',
+  ),
+  Achievement(
+    id: AchievementId.day5,
+    title: 'Opening Week',
+    description: 'Reach Day 5',
+    emoji: '📅',
+  ),
+  Achievement(
+    id: AchievementId.day10,
+    title: 'Established Florist',
+    description: 'Reach Day 10',
+    emoji: '🏪',
+  ),
+  Achievement(
+    id: AchievementId.earn500,
+    title: 'Coin Collector',
+    description: 'Earn \$500 in total',
+    emoji: '🪙',
+    target: 500,
+  ),
+  Achievement(
+    id: AchievementId.earn2000,
+    title: 'Prospering Shop',
+    description: 'Earn \$2,000 in total',
+    emoji: '💎',
+    target: 2000,
+  ),
+  Achievement(
+    id: AchievementId.greatStreak3,
+    title: 'On a Roll',
+    description: '3 Great orders in a row',
+    emoji: '🔥',
+    target: 3,
+  ),
+  Achievement(
+    id: AchievementId.serve50,
+    title: 'Busy Florist',
+    description: 'Serve 50 customers',
+    emoji: '💐',
+    target: 50,
+  ),
+  Achievement(
+    id: AchievementId.serve100,
+    title: 'Town Legend',
+    description: 'Serve 100 customers',
+    emoji: '🏆',
+    target: 100,
+  ),
+  Achievement(
+    id: AchievementId.allVibes,
+    title: 'Vibe Master',
+    description: 'Successfully nail all 18 vibes',
+    emoji: '🎨',
+    target: 18,
+  ),
+  Achievement(
+    id: AchievementId.firstUpgrade,
+    title: 'Investing in Beauty',
+    description: 'Buy your first shop upgrade',
+    emoji: '🔨',
+  ),
+  Achievement(
+    id: AchievementId.perfectDay,
+    title: 'Perfect Day',
+    description: 'Complete a day with zero poor ratings',
+    emoji: '⭐',
+  ),
+  Achievement(
+    id: AchievementId.firstChallenge,
+    title: 'Challenge Accepted',
+    description: 'Complete your first daily challenge',
+    emoji: '📋',
+  ),
+  Achievement(
+    id: AchievementId.rankMaster,
+    title: 'Master Florist',
+    description: 'Reach Master Florist rank',
+    emoji: '🌺',
+  ),
+  Achievement(
+    id: AchievementId.rankLegend,
+    title: 'Bloom Legend',
+    description: 'Reach the highest florist rank',
+    emoji: '👑',
+  ),
+];

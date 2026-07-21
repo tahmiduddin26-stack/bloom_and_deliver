@@ -1,0 +1,46 @@
+name: bloom_and_deliver
+description: "Bloom & Deliver — a cosy flower bouquet crafting game."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+  google_fonts: ^6.2.1
+  shared_preferences: ^2.3.0
+
+  # Tier 7 — Polish & retention
+  flutter_local_notifications: ^17.2.4   # push/local notifications
+  audioplayers: ^6.1.0                   # ambient sounds, jingles
+  share_plus: ^10.1.4                    # bouquet share card
+  path_provider: ^2.1.5                  # temp file for share image
+
+  # Ads
+  google_mobile_ads: ^5.1.0             # AdMob banner
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.14
+  riverpod_generator: ^2.6.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    # Flower 3D renders — drop {flower_id}.png here to replace the emoji
+    - assets/flowers/
+
+    # Character portraits — lily.png and bud.png
+    - assets/characters/
+
+    # Sound effects & music — see assets/audio/README for expected filenames
+    - assets/audio/
