@@ -21,11 +21,11 @@ void main() {
     expect(Features.shopInterior, isFalse, reason: 'shop interior is post-launch');
     expect(Features.upgrades, isFalse, reason: 'upgrades are post-launch');
     expect(Features.achievements, isFalse, reason: 'achievements are post-launch');
-    expect(Features.vibeNotebook, isFalse,
-        reason: 'notebook has no live entry point — off until one is wired');
   });
 
   test('kept on for launch', () {
     expect(Features.shopDecor, isTrue, reason: 'decor is the Phase 2 money sink');
+    expect(Features.vibeNotebook, isTrue,
+        reason: 'notebook is the Phase 4 collection axis (level-map entry)');
   });
 }

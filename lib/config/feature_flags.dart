@@ -29,12 +29,13 @@ abstract final class Features {
   static bool upgrades = false;
   static bool achievements = false;
 
-  /// Vibe notebook reference. Off for launch: it has no entry point in the live
-  /// PlayScreen flow (its only button lived in the now-removed GameScreen), so
-  /// keeping it on would be dishonest. Wire an entry point before re-enabling.
-  static bool vibeNotebook = false;
-
   // ── Kept on ─────────────────────────────────────────────────────────────
+  /// Vibe notebook — the collection axis (Phase 4 retention). The player is
+  /// already accumulating `vibeDiscoveries` in the live flow; the notebook gives
+  /// that a home and a "complete all 18" pull. Entry point: the 📓 button on the
+  /// level-map header.
+  static bool vibeNotebook = true;
+
   /// Shop decor / collection — the late-game money sink (Phase 2). Decor gives
   /// accumulated cash somewhere meaningful to go, so restocking a deep, diverse
   /// inventory competes with saving toward an aspirational showpiece.

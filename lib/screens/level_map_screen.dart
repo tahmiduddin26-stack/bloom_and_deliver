@@ -20,6 +20,7 @@ import 'shop_decor_screen.dart';
 import 'shop_interior_screen.dart';
 import 'town_map_screen.dart';
 import 'upgrades_screen.dart';
+import 'vibe_notebook_screen.dart';
 import 'wholesale_screen.dart';
 
 /// Candy-Crush-style campaign map: a winding garden path of 20 level nodes.
@@ -364,6 +365,14 @@ class _MapHeader extends StatelessWidget {
           _HeaderChip(emoji: '⭐', label: '$totalStars'),
           const SizedBox(width: 6),
           _HeaderChip(emoji: '🪙', label: '\$$money'),
+          if (Features.vibeNotebook) ...[
+            const SizedBox(width: 6),
+            _HeaderIconButton(
+              emoji: '📓',
+              tooltip: 'Vibe Notebook',
+              onTap: () => openVibeNotebook(context),
+            ),
+          ],
           if (Features.townMap) ...[
             const SizedBox(width: 6),
             _HeaderIconButton(
