@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -350,24 +352,30 @@ class _MapHeader extends StatelessWidget {
           _HeaderChip(emoji: '⭐', label: '$totalStars'),
           const SizedBox(width: 6),
           _HeaderChip(emoji: '🪙', label: '\$$money'),
-          const SizedBox(width: 6),
-          _HeaderIconButton(
-            emoji: '🗺️',
-            tooltip: 'Town Map',
-            onTap: onTownMap,
-          ),
-          const SizedBox(width: 4),
-          _HeaderIconButton(
-            emoji: '🔨',
-            tooltip: 'Shop Upgrades',
-            onTap: () => openUpgradesScreen(context),
-          ),
-          const SizedBox(width: 4),
-          _HeaderIconButton(
-            emoji: '🎨',
-            tooltip: 'Shop Decor',
-            onTap: () => openShopDecorScreen(context),
-          ),
+          if (Features.townMap) ...[
+            const SizedBox(width: 6),
+            _HeaderIconButton(
+              emoji: '🗺️',
+              tooltip: 'Town Map',
+              onTap: onTownMap,
+            ),
+          ],
+          if (Features.upgrades) ...[
+            const SizedBox(width: 4),
+            _HeaderIconButton(
+              emoji: '🔨',
+              tooltip: 'Shop Upgrades',
+              onTap: () => openUpgradesScreen(context),
+            ),
+          ],
+          if (Features.shopDecor) ...[
+            const SizedBox(width: 4),
+            _HeaderIconButton(
+              emoji: '🎨',
+              tooltip: 'Shop Decor',
+              onTap: () => openShopDecorScreen(context),
+            ),
+          ],
         ],
       ),
     );

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -704,6 +706,7 @@ Future<void> openDeliveryScreen(
   BuildContext context, {
   required VoidCallback onDone,
 }) {
+  if (!Features.deliveries) return Future<void>.value();
   return Navigator.of(context).push(
     PageRouteBuilder(
       pageBuilder: (_, __, ___) => DeliveryScreen(onDone: () {

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -368,8 +370,9 @@ class _MarketHeader extends StatelessWidget {
             ),
           ),
           // Wholesale button
-          GestureDetector(
-            onTap: () => openWholesaleScreen(context),
+          if (Features.wholesale)
+            GestureDetector(
+              onTap: () => openWholesaleScreen(context),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
               margin: const EdgeInsets.only(right: 8),

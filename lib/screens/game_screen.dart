@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -145,8 +147,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           showEndOfDayDialog( // ignore: use_build_context_synchronously
             context,
             onGoToMarket: _openMarket,
-            onGoToDeliveries: _openDeliveries,
-            onGoToBigOrder: _openBigOrder,
+            onGoToDeliveries: Features.deliveries ? _openDeliveries : null,
+            onGoToBigOrder: Features.bigOrders ? _openBigOrder : null,
           );
         });
       }
@@ -878,48 +880,62 @@ class _TopBar extends StatelessWidget {
                   tooltip: 'Level Map',
                   onTap: onLevelMap,
                 ),
-                const SizedBox(width: 6),
-                _NavIconButton(
-                  emoji: '🔨',
-                  tooltip: 'Upgrades',
-                  onTap: onUpgrades,
-                ),
-                const SizedBox(width: 6),
-                _NavIconButton(
-                  emoji: '🏆',
-                  tooltip: 'Achievements',
-                  onTap: onAchievements,
-                ),
-                const SizedBox(width: 6),
-                _NavIconButton(
-                  emoji: '📓',
-                  tooltip: 'Vibe Notebook',
-                  onTap: onNotebook,
-                ),
-                const SizedBox(width: 6),
-                _NavIconButton(
-                  emoji: '🎨',
-                  tooltip: 'Shop Decor',
-                  onTap: onDecor,
-                ),
-                const SizedBox(width: 6),
-                _NavIconButton(
-                  emoji: '📊',
-                  tooltip: 'Stats',
-                  onTap: onStats,
-                ),
-                const SizedBox(width: 6),
-                _NavIconButton(
-                  emoji: '🗺️',
-                  tooltip: 'Town Map',
-                  onTap: onTownMap,
-                ),
-                const SizedBox(width: 6),
-                _NavIconButton(
-                  emoji: '🏅',
-                  tooltip: 'Leaderboard',
-                  onTap: onLeaderboard,
-                ),
+                if (Features.upgrades) ...[
+                  const SizedBox(width: 6),
+                  _NavIconButton(
+                    emoji: '🔨',
+                    tooltip: 'Upgrades',
+                    onTap: onUpgrades,
+                  ),
+                ],
+                if (Features.achievements) ...[
+                  const SizedBox(width: 6),
+                  _NavIconButton(
+                    emoji: '🏆',
+                    tooltip: 'Achievements',
+                    onTap: onAchievements,
+                  ),
+                ],
+                if (Features.vibeNotebook) ...[
+                  const SizedBox(width: 6),
+                  _NavIconButton(
+                    emoji: '📓',
+                    tooltip: 'Vibe Notebook',
+                    onTap: onNotebook,
+                  ),
+                ],
+                if (Features.shopDecor) ...[
+                  const SizedBox(width: 6),
+                  _NavIconButton(
+                    emoji: '🎨',
+                    tooltip: 'Shop Decor',
+                    onTap: onDecor,
+                  ),
+                ],
+                if (Features.shopStats) ...[
+                  const SizedBox(width: 6),
+                  _NavIconButton(
+                    emoji: '📊',
+                    tooltip: 'Stats',
+                    onTap: onStats,
+                  ),
+                ],
+                if (Features.townMap) ...[
+                  const SizedBox(width: 6),
+                  _NavIconButton(
+                    emoji: '🗺️',
+                    tooltip: 'Town Map',
+                    onTap: onTownMap,
+                  ),
+                ],
+                if (Features.leaderboard) ...[
+                  const SizedBox(width: 6),
+                  _NavIconButton(
+                    emoji: '🏅',
+                    tooltip: 'Leaderboard',
+                    onTap: onLeaderboard,
+                  ),
+                ],
               ],
             ),
           ),

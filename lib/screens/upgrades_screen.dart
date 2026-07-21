@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -8,6 +10,7 @@ import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 
 void openUpgradesScreen(BuildContext context) {
+  if (!Features.upgrades) return;
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,

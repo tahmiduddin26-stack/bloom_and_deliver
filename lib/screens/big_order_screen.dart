@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -527,8 +529,9 @@ class _ResultCard extends StatelessWidget {
 Future<void> openBigOrderScreen(
   BuildContext context, {
   required VoidCallback onDone,
-}) =>
-    Navigator.of(context).push(
+}) {
+  if (!Features.bigOrders) return Future<void>.value();
+  return Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => BigOrderScreen(onDone: () {
           Navigator.of(context).pop();
@@ -543,3 +546,4 @@ Future<void> openBigOrderScreen(
         ),
       ),
     );
+}

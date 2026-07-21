@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -138,8 +140,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           showEndOfDayDialog(
             context, // ignore: use_build_context_synchronously
             onGoToMarket: _openMarket,
-            onGoToDeliveries: _openDeliveries,
-            onGoToBigOrder: _openBigOrder,
+            onGoToDeliveries: Features.deliveries ? _openDeliveries : null,
+            onGoToBigOrder: Features.bigOrders ? _openBigOrder : null,
           );
         });
       }

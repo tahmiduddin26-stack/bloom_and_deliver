@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -396,8 +398,9 @@ class _TopFlowersCard extends StatelessWidget {
 
 // ── Navigation helper ──────────────────────────────────────────────────────────
 
-Future<void> openShopStatsScreen(BuildContext context) =>
-    Navigator.of(context).push(
+Future<void> openShopStatsScreen(BuildContext context) {
+  if (!Features.shopStats) return Future<void>.value();
+  return Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => const ShopStatsScreen(),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
@@ -409,3 +412,4 @@ Future<void> openShopStatsScreen(BuildContext context) =>
         ),
       ),
     );
+}

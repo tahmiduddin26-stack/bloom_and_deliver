@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -13,6 +15,7 @@ import '../theme/app_theme.dart';
 // "Score" = money earned + 10× deliveries completed + 5× great orders.
 
 void openLeaderboardScreen(BuildContext context) {
+  if (!Features.leaderboard) return;
   Navigator.of(context).push(
     PageRouteBuilder(
       transitionDuration: const Duration(milliseconds: 380),

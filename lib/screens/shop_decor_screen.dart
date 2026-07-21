@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -464,7 +466,9 @@ class _StatusBadge extends StatelessWidget {
 
 // ── Navigation helper ──────────────────────────────────────────────────────────
 
-Future<void> openShopDecorScreen(BuildContext context) => Navigator.of(context).push(
+Future<void> openShopDecorScreen(BuildContext context) {
+  if (!Features.shopDecor) return Future<void>.value();
+  return Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => const ShopDecorScreen(),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
@@ -476,3 +480,4 @@ Future<void> openShopDecorScreen(BuildContext context) => Navigator.of(context).
         ),
       ),
     );
+}

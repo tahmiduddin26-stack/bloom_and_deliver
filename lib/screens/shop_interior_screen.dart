@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,6 +22,7 @@ import 'vibe_notebook_screen.dart';
 
 /// Open the shop interior screen (slides up from bottom, like the town map).
 Future<void> openShopInteriorScreen(BuildContext context) {
+  if (!Features.shopInterior) return Future<void>.value();
   return Navigator.of(context).push(
     PageRouteBuilder(
       transitionDuration: const Duration(milliseconds: 360),

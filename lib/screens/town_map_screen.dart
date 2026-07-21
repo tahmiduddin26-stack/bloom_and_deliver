@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../config/feature_flags.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -29,6 +31,7 @@ void openTownMapScreen(
   VoidCallback? onGoToMarket,
   VoidCallback? onGoToWholesale,
 }) {
+  if (!Features.townMap) return;
   Navigator.of(context).push(
     PageRouteBuilder(
       transitionDuration: const Duration(milliseconds: 380),
