@@ -9,6 +9,7 @@ import '../data/seasonal_events_data.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ambient_petals.dart';
 import '../widgets/daily_challenges_strip.dart';
 import '../widgets/reputation_board.dart';
 import '../widgets/seasonal_banner.dart';
@@ -151,6 +152,7 @@ class _LevelMapScreenState extends ConsumerState<LevelMapScreen> {
         child: SafeArea(
           child: Stack(
             children: [
+          const Positioned.fill(child: AmbientPetals()),
           Column(
             children: [
               _MapHeader(

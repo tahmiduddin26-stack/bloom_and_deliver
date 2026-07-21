@@ -15,6 +15,7 @@ import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/achievement_popup.dart';
+import '../widgets/ambient_petals.dart';
 import '../widgets/end_of_day_dialog.dart';
 import '../widgets/flower_image.dart';
 import '../widgets/memory_popup.dart';
@@ -189,6 +190,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           child: SafeArea(
             child: Stack(
               children: [
+                const Positioned.fill(child: AmbientPetals()),
                 Column(
                   children: [
                     _Header(
@@ -200,7 +202,25 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                     ),
                     const SizedBox(height: 6),
                     if (order != null)
-                      _CustomerCard(order: order, workspace: state.bouquetWorkspace)
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 420),
+                        switchInCurve: Curves.easeOutCubic,
+                        transitionBuilder: (child, anim) => FadeTransition(
+                          opacity: anim,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, -0.14),
+                              end: Offset.zero,
+                            ).animate(anim),
+                            child: child,
+                          ),
+                        ),
+                        child: _CustomerCard(
+                          key: ValueKey(state.currentOrderIndex),
+                          order: order,
+                          workspace: state.bouquetWorkspace,
+                        ),
+                      )
                     else
                       const Expanded(
                         child: Center(child: Text('🌙', style: TextStyle(fontSize: 48))),
@@ -463,7 +483,7 @@ class _CustomerCard extends StatelessWidget {
   final BouquetOrder order;
   final List<Flower> workspace;
 
-  const _CustomerCard({required this.order, required this.workspace});
+  const _CustomerCard({super.key, required this.order, required this.workspace});
 
   @override
   Widget build(BuildContext context) {
@@ -590,31 +610,75 @@ class _CustomerCard extends StatelessWidget {
   }
 }
 
-class _MatchChip extends StatelessWidget {
+class _MatchChip extends StatefulWidget {
   final VibeTag vibe;
   final bool covered;
 
   const _MatchChip({required this.vibe, required this.covered});
 
   @override
+  State<_MatchChip> createState() => _MatchChipState();
+}
+
+class _MatchChipState extends State<_MatchChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 440),
+  );
+
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 1.28).chain(CurveTween(curve: Curves.easeOut)),
+      weight: 35,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.28, end: 1.0)
+          .chain(CurveTween(curve: Curves.elasticOut)),
+      weight: 65,
+    ),
+  ]).animate(_pop);
+
+  @override
+  void didUpdateWidget(_MatchChip old) {
+    super.didUpdateWidget(old);
+    // Pop when this vibe goes from unmatched → matched.
+    if (widget.covered && !old.covered) {
+      HapticFeedback.selectionClick();
+      _pop.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: covered ? vibe.color : vibe.color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: vibe.color, width: 1.5),
-        boxShadow: covered
-            ? [BoxShadow(color: vibe.color.withValues(alpha: 0.5), blurRadius: 8)]
-            : [],
-      ),
-      child: Text(
-        covered ? '✓ ${vibe.label}' : vibe.label,
-        style: GoogleFonts.nunito(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          color: covered ? Colors.white : vibe.color,
+    final vibe = widget.vibe;
+    final covered = widget.covered;
+    return ScaleTransition(
+      scale: _scale,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: covered ? vibe.color : vibe.color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: vibe.color, width: 1.5),
+          boxShadow: covered
+              ? [BoxShadow(color: vibe.color.withValues(alpha: 0.5), blurRadius: 8)]
+              : [],
+        ),
+        child: Text(
+          covered ? '✓ ${vibe.label}' : vibe.label,
+          style: GoogleFonts.nunito(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: covered ? Colors.white : vibe.color,
+          ),
         ),
       ),
     );
@@ -987,7 +1051,7 @@ class _TrayPot extends StatelessWidget {
 
 // ── Submit bar ─────────────────────────────────────────────────────────────────
 
-class _SubmitBar extends StatelessWidget {
+class _SubmitBar extends StatefulWidget {
   final BouquetOrder order;
   final int count;
   final VoidCallback onSubmit;
@@ -999,35 +1063,61 @@ class _SubmitBar extends StatelessWidget {
   });
 
   @override
+  State<_SubmitBar> createState() => _SubmitBarState();
+}
+
+class _SubmitBarState extends State<_SubmitBar>
+    with SingleTickerProviderStateMixin {
+  // Always-on gentle breathing; only applied to scale when the button is ready,
+  // so a completed bouquet quietly invites the tap.
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ready = count >= order.minFlowers;
-    final needed = order.minFlowers - count;
+    final ready = widget.count >= widget.order.minFlowers;
+    final needed = widget.order.minFlowers - widget.count;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-      child: SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton(
-          onPressed: ready ? onSubmit : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFEC407A),
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: Colors.white.withValues(alpha: 0.6),
-            disabledForegroundColor: AppColors.brownLight,
-            elevation: ready ? 6 : 0,
-            shadowColor: const Color(0xFFEC407A).withValues(alpha: 0.5),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+      child: AnimatedBuilder(
+        animation: _pulse,
+        builder: (_, child) => Transform.scale(
+          scale: ready ? 1.0 + 0.025 * _pulse.value : 1.0,
+          child: child,
+        ),
+        child: SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: ready ? widget.onSubmit : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEC407A),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.white.withValues(alpha: 0.6),
+              disabledForegroundColor: AppColors.brownLight,
+              elevation: ready ? 6 : 0,
+              shadowColor: const Color(0xFFEC407A).withValues(alpha: 0.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
             ),
-          ),
-          child: Text(
-            ready
-                ? 'Give Bouquet  🎀'
-                : 'Add $needed more flower${needed == 1 ? '' : 's'}…',
-            style: GoogleFonts.nunito(
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
+            child: Text(
+              ready
+                  ? 'Give Bouquet  🎀'
+                  : 'Add $needed more flower${needed == 1 ? '' : 's'}…',
+              style: GoogleFonts.nunito(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ),
