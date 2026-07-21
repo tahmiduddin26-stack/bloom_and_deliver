@@ -1,8 +1,8 @@
 // Release guard for the Phase 1 shipping surface.
 //
 // SHIP_PLAN Phase 1 cuts the reachable game down to: level map → play → market
-// → repeat, plus the customer phone and the vibe notebook aid. Every other
-// system is built but flagged off until it ships as a post-launch content drop.
+// → repeat, plus the decor money sink. Every other system is built but flagged
+// off until it ships as a post-launch content drop.
 //
 // This test is intentionally a tripwire: if someone flips a system on, they must
 // consciously update this expectation, which forces a deliberate scope decision
@@ -21,10 +21,11 @@ void main() {
     expect(Features.shopInterior, isFalse, reason: 'shop interior is post-launch');
     expect(Features.upgrades, isFalse, reason: 'upgrades are post-launch');
     expect(Features.achievements, isFalse, reason: 'achievements are post-launch');
+    expect(Features.vibeNotebook, isFalse,
+        reason: 'notebook has no live entry point — off until one is wired');
   });
 
-  test('core-supporting aids stay on', () {
-    expect(Features.vibeNotebook, isTrue, reason: 'notebook aids the core loop');
+  test('kept on for launch', () {
     expect(Features.shopDecor, isTrue, reason: 'decor is the Phase 2 money sink');
   });
 }

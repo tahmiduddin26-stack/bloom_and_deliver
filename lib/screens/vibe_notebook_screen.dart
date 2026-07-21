@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../config/feature_flags.dart';
 import '../models/flower.dart';
 import '../providers/game_provider.dart';
 import '../theme/app_theme.dart';
@@ -393,6 +394,7 @@ class _CompletionBanner extends StatelessWidget {
 // ── Navigation helper ──────────────────────────────────────────────────────────
 
 void openVibeNotebook(BuildContext context) {
+  if (!Features.vibeNotebook) return;
   Navigator.of(context).push(
     PageRouteBuilder(
       pageBuilder: (_, __, ___) => const VibeNotebookScreen(),

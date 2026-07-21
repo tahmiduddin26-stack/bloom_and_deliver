@@ -1,7 +1,7 @@
 /// Feature flags gating non-core surfaces for the shipping build.
 ///
 /// Per SHIP_PLAN Phase 1 ("Cut to the core loop"), the shipping surface is:
-///   level map → play a day → market → repeat, plus the customer phone.
+///   level map → play a day → market → repeat, plus the decor shop.
 ///
 /// Everything else is built and kept in the codebase, but flagged **off** so
 /// QA, tuning, and store screenshots only ever cover the shipped loop. Flipping
@@ -11,8 +11,8 @@
 /// Gating is enforced in two places:
 ///   1. The `open<Screen>` navigation helpers early-return when their flag is
 ///      off, so no non-core screen is ever reachable even if a button is missed.
-///   2. The hub UIs (level map, game HUD, market, end-of-day dialog) hide the
-///      entry points for flagged-off systems, so there are no dead buttons.
+///   2. The hub UIs (level map, market, end-of-day dialog) hide the entry
+///      points for flagged-off systems, so there are no dead buttons.
 ///
 /// Flags are mutable `static bool`s rather than `const` so that (a) QA and
 /// widget tests can flip a system back on at runtime, and (b) the analyzer does
@@ -29,10 +29,12 @@ abstract final class Features {
   static bool upgrades = false;
   static bool achievements = false;
 
-  // ── Core-supporting aids (kept on) ──────────────────────────────────────
-  /// Vibe notebook reference — directly supports the core matching mechanic.
-  static bool vibeNotebook = true;
+  /// Vibe notebook reference. Off for launch: it has no entry point in the live
+  /// PlayScreen flow (its only button lived in the now-removed GameScreen), so
+  /// keeping it on would be dishonest. Wire an entry point before re-enabling.
+  static bool vibeNotebook = false;
 
+  // ── Kept on ─────────────────────────────────────────────────────────────
   /// Shop decor / collection — the late-game money sink (Phase 2). Decor gives
   /// accumulated cash somewhere meaningful to go, so restocking a deep, diverse
   /// inventory competes with saving toward an aspirational showpiece.
