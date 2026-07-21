@@ -142,6 +142,17 @@ void main() {
     print(report);
 
     expect(end.money, greaterThan(0), reason: 'player went bankrupt');
+
+    // Economy tension guard (Phase 2). A greedy-but-imperfect bot should NOT
+    // three-star the whole campaign: star3 now demands mostly-Great play, so a
+    // competent bot lands around competent-completion (2★) with the odd 3★.
+    // The old, broken balance let it score 57/60. Keep the band generous to
+    // absorb shuffle variance while still catching a regression to "no tension".
+    // If this fails high, nudge star3Earnings up; if it fails low, nudge down.
+    expect(totalStars, lessThanOrEqualTo(50),
+        reason: 'star goals too loose — campaign is not constraining ($totalStars/60)');
+    expect(totalStars, greaterThanOrEqualTo(24),
+        reason: 'star goals too harsh for a competent player ($totalStars/60)');
   });
 
   test('flower data integrity', () {
