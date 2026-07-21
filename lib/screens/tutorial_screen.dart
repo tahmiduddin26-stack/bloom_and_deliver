@@ -35,17 +35,17 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen>
     _TutStep(
       character: GameCharacter.bud,
       message:
-          'Hey! I\'m Bud! 🌿\n\nCustomers send orders through the phone on the '
-          'right. Tap it to see what kind of bouquet they\'re after — each '
-          'message hints at the vibe they want!',
+          'Hey! I\'m Bud! 🌿\n\nEach customer waits up at the top — read their '
+          'note and the vibe tags to work out what kind of bouquet they\'re '
+          'after!',
       bgGradient: [Color(0xFFF1FFF5), Color(0xFFE8F5E9)],
     ),
     _TutStep(
       character: GameCharacter.lily,
       message:
-          'See those flowers on the shelves? ✨\n\nDrag them down into the '
-          'workspace to start building your bouquet. Mix and match colours '
-          'and vibes to nail what the customer asked for!',
+          'See the flower tray along the bottom? ✨\n\nTap a bloom (or drag it '
+          'up) to add it to your workspace. Mix and match colours and vibes to '
+          'nail what the customer asked for!',
       bgGradient: [Color(0xFFFFFDE7), Color(0xFFFFF8E1)],
     ),
     _TutStep(
