@@ -21,6 +21,7 @@ import '../models/game_state.dart';
 import '../models/growing_plant.dart';
 import '../models/shop_decoration.dart';
 import '../models/shop_upgrades.dart';
+import '../services/analytics_service.dart';
 import '../services/persistence_service.dart';
 import 'saved_state_provider.dart';
 
@@ -250,6 +251,10 @@ class GameNotifier extends Notifier<GameState> {
 
     final newFriendshipMap = Map<String, int>.from(state.customerFriendship);
     newFriendshipMap[customer.id] = newFriendship;
+
+    if (newFriendship > currentFriendship) {
+      AnalyticsService.instance.friendshipLevelUp(customer.id, newFriendship);
+    }
 
     // Check if a new snippet tier was crossed
     final newPendingMemories = List<String>.from(state.pendingMemories);
@@ -577,6 +582,7 @@ class GameNotifier extends Notifier<GameState> {
       inventory: bonusInventory,
       inventoryDayAdded: bonusDayAdded,
     );
+    AnalyticsService.instance.loginStreak(newStreak);
     PersistenceService.saveState(state);
   }
 

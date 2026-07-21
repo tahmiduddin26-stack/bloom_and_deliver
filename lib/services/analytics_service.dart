@@ -31,6 +31,14 @@ abstract class AnalyticsService {
 
   void tutorialSkipped(int atIndex) =>
       logEvent('tutorial_skipped', {'at_index': atIndex});
+
+  // ── Retention (Phase 4) ─────────────────────────────────────────────────
+  /// Fires once per real calendar day the app is opened — [days] is the
+  /// consecutive-day streak, so day-2 / day-3 / day-7 returns are measurable.
+  void loginStreak(int days) => logEvent('login_streak', {'days': days});
+
+  void friendshipLevelUp(String customerId, int level) => logEvent(
+      'friendship_level_up', {'customer': customerId, 'level': level});
 }
 
 /// Default implementation: does nothing. Swap out `AnalyticsService.instance`

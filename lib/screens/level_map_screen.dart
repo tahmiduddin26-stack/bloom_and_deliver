@@ -159,6 +159,7 @@ class _LevelMapScreenState extends ConsumerState<LevelMapScreen> {
                 money: state.money,
                 totalStars: state.totalStars,
                 nextLevel: nextLevel,
+                loginStreak: state.loginStreak,
                 onTownMap: _openTownMap,
               ),
               // Today's challenges (rewards pay out while playing)
@@ -297,12 +298,14 @@ class _MapHeader extends StatelessWidget {
   final int money;
   final int totalStars;
   final int nextLevel;
+  final int loginStreak;
   final VoidCallback onTownMap;
 
   const _MapHeader({
     required this.money,
     required this.totalStars,
     required this.nextLevel,
+    required this.loginStreak,
     required this.onTownMap,
   });
 
@@ -351,6 +354,13 @@ class _MapHeader extends StatelessWidget {
               ],
             ),
           ),
+          if (loginStreak >= 2) ...[
+            _HeaderChip(
+              emoji: '🔥',
+              label: loginStreak % 7 == 0 ? '$loginStreak 🎁' : '$loginStreak',
+            ),
+            const SizedBox(width: 6),
+          ],
           _HeaderChip(emoji: '⭐', label: '$totalStars'),
           const SizedBox(width: 6),
           _HeaderChip(emoji: '🪙', label: '\$$money'),

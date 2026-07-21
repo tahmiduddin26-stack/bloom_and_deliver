@@ -219,6 +219,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                           key: ValueKey(state.currentOrderIndex),
                           order: order,
                           workspace: state.bouquetWorkspace,
+                          friendship: state.friendshipFor(order.customer.id),
                         ),
                       )
                     else
@@ -482,12 +483,25 @@ class _Header extends StatelessWidget {
 class _CustomerCard extends StatelessWidget {
   final BouquetOrder order;
   final List<Flower> workspace;
+  final int friendship;
 
-  const _CustomerCard({super.key, required this.order, required this.workspace});
+  const _CustomerCard({
+    super.key,
+    required this.order,
+    required this.workspace,
+    required this.friendship,
+  });
 
   @override
   Widget build(BuildContext context) {
     final covered = workspace.expand((f) => f.vibes).toSet();
+    final customer = order.customer;
+    final maxF = customer.maxFriendship;
+    // A maxed-out regular unlocks their life-event moment — the emotional payoff
+    // of the relationship, and the reason to keep serving them.
+    final showLifeEvent = customer.isRegular &&
+        friendship >= maxF &&
+        customer.lifeEventHint != null;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12),
@@ -549,6 +563,10 @@ class _CustomerCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (customer.isRegular) ...[
+                      const SizedBox(height: 4),
+                      _FriendshipHearts(level: friendship, max: maxF),
+                    ],
                     const SizedBox(height: 3),
                     Text(
                       order.hint,
@@ -604,6 +622,84 @@ class _CustomerCard extends StatelessWidget {
                 ),
               ],
             ),
+          if (showLifeEvent) ...[
+            const SizedBox(height: 10),
+            _LifeEventBanner(
+              name: customer.name,
+              hint: customer.lifeEventHint!,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// Friendship hearts (0–max) shown under a regular's name.
+class _FriendshipHearts extends StatelessWidget {
+  final int level;
+  final int max;
+
+  const _FriendshipHearts({required this.level, required this.max});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < max; i++)
+          Padding(
+            padding: const EdgeInsets.only(right: 2),
+            child: Text(
+              i < level ? '❤️' : '🤍',
+              style: const TextStyle(fontSize: 10),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// The life-event payoff for a maxed-out regular — their story's big moment.
+class _LifeEventBanner extends StatelessWidget {
+  final String name;
+  final String hint;
+
+  const _LifeEventBanner({required this.name, required this.hint});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFF0F5), Color(0xFFFCE4EC)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF48FB1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '💖 $name trusts you completely',
+            style: GoogleFonts.nunito(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFFC2185B),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hint,
+            style: GoogleFonts.nunito(
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+              height: 1.35,
+              color: AppColors.brownDark,
+            ),
+          ),
         ],
       ),
     );
