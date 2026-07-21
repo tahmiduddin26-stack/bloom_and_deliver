@@ -7,7 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../data/level_data.dart';
 import '../data/seasonal_events_data.dart';
 import '../providers/game_provider.dart';
+import '../services/analytics_service.dart';
 import '../services/audio_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ambient_petals.dart';
 import '../widgets/daily_challenges_strip.dart';
@@ -365,6 +367,8 @@ class _MapHeader extends StatelessWidget {
           _HeaderChip(emoji: '⭐', label: '$totalStars'),
           const SizedBox(width: 6),
           _HeaderChip(emoji: '🪙', label: '\$$money'),
+          const SizedBox(width: 6),
+          const _ReminderBell(),
           if (Features.vibeNotebook) ...[
             const SizedBox(width: 6),
             _HeaderIconButton(
@@ -434,6 +438,57 @@ class _HeaderIconButton extends StatelessWidget {
             ),
           ),
         ),
+      );
+}
+
+// Strictly opt-in daily-reminder toggle. Off by default; enabling it requests
+// notification permission and schedules a single gentle daily reminder.
+class _ReminderBell extends StatefulWidget {
+  const _ReminderBell();
+
+  @override
+  State<_ReminderBell> createState() => _ReminderBellState();
+}
+
+class _ReminderBellState extends State<_ReminderBell> {
+  bool _on = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final v = await NotificationService.instance.isDailyReminderEnabled();
+    if (mounted) setState(() => _on = v);
+  }
+
+  Future<void> _toggle() async {
+    final next = !_on;
+    setState(() => _on = next);
+    AnalyticsService.instance
+        .logEvent('reminder_toggled', {'enabled': next});
+    await NotificationService.instance.setDailyReminder(next);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          next
+              ? '🔔 Lily will send one gentle reminder a day.'
+              : 'Daily reminder turned off.',
+        ),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => _HeaderIconButton(
+        emoji: _on ? '🔔' : '🔕',
+        tooltip: _on ? 'Daily reminder on' : 'Daily reminder off',
+        onTap: _toggle,
       );
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Manages local push notifications for Bloom & Deliver.
 /// All copy is written in Lily's voice as per Tier 7 spec.
@@ -118,5 +119,42 @@ class NotificationService {
   Future<void> cancelAll() async {
     if (!_ready) return;
     await _plugin.cancelAll();
+  }
+
+  // ── Opt-in daily reminder ────────────────────────────────────────────────
+  //
+  // Strictly opt-in and off by default: nothing is scheduled and no Android
+  // permission is requested until the player enables it. A cozy game must never
+  // nag, so this is the only recurring notification and the player owns it.
+
+  static const _prefKeyReminder = 'daily_reminder_enabled';
+
+  /// Whether the player has opted into the daily reminder (persisted).
+  Future<bool> isDailyReminderEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_prefKeyReminder) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Turn the daily reminder on or off. On enable, best-effort requests the
+  /// Android 13+ notification permission (iOS is handled at init) and schedules
+  /// the reminder; on disable, cancels it. The player's choice is persisted.
+  /// All underlying calls fail silently, so this never throws.
+  Future<void> setDailyReminder(bool enabled) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefKeyReminder, enabled);
+    } catch (_) {
+      // Preference persistence is best-effort.
+    }
+    if (enabled) {
+      await requestPermissions();
+      await scheduleDailyReminder();
+    } else {
+      await cancelAll();
+    }
   }
 }
