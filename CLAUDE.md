@@ -1,172 +1,124 @@
 # Bloom & Deliver — Project Reference
 
-A cosy mobile game built in **Flutter** where the player runs a flower shop. Customers arrive with bouquet orders described through personality-driven hints. The player drags flowers from inventory into a workspace, submits the bouquet, and earns money based on how well the flowers match the order's vibe requirements. At end of day, the player restocks inventory before the next day begins.
+A cosy mobile game built in **Flutter** where the player runs a flower shop. Customers arrive with bouquet orders described through personality-driven hints. The player taps or drags flowers from a tray into a workspace, submits the bouquet, and earns money based on how well the flowers match the order's vibe requirements. Between days the player restocks at the market.
+
+> **Roadmap:** `SHIP_PLAN.md` is the phased plan to ship. Read it before large changes — it explains *why* much of the codebase is deliberately switched off.
 
 ---
 
 ## Tech Stack
 
 - **Flutter** (Dart, SDK ^3.11.5)
-- **Riverpod 2.x** (flutter_riverpod, NotifierProvider pattern — no code generation used)
+- **Riverpod 2.x** (`NotifierProvider`, no code generation)
 - **Google Fonts** (Playfair Display + Nunito)
-- **shared_preferences** for save/load persistence
+- **shared_preferences** for save/load
 
 ---
 
-## Project Structure
+## The shipping surface (read this first)
+
+The repo contains far more systems than the game ships with. `lib/config/feature_flags.dart` gates them, and **the reachable game is only**:
+
+```
+main.dart → TutorialScreen (new players) → LevelMapScreen (hub)
+              → PlayScreen → end-of-day dialog → MarketScreen → back to hub
+              → GemShopScreen / VibeNotebookScreen / ShopDecorScreen
+```
+
+| Flag | State | Notes |
+|---|---|---|
+| `shopDecor`, `vibeNotebook` | **on** | Money sink + collection axis |
+| `townMap`, `wholesale`, `bigOrders`, `deliveries`, `leaderboard`, `shopStats`, `shopInterior`, `upgrades`, `achievements` | **off** | Built, kept as the post-launch content roadmap |
+| `ads` | **off** | No live screen shows a banner; `ad_service.dart` still has placeholder unit IDs |
+
+Gating is enforced in two layers, so a missed button can't leak a screen:
+1. Every `open<Screen>()` helper early-returns when its flag is off.
+2. Hub UIs hide the entry points.
+
+`test/feature_flags_test.dart` is a tripwire — flipping a flag fails it on purpose, forcing a deliberate scope decision.
+
+**Anything reachable must be real.** Don't write level text or tutorial copy that promises a flagged-off system.
+
+---
+
+## Project structure
 
 ```
 lib/
-  main.dart                        # App entry — loads save, boots ProviderScope
-  models/
-    flower.dart                    # Flower + VibeTag models; unlockDay field gates progression
-    bouquet_order.dart             # BouquetOrder + OrderResult; score() applies loyaltyMultiplier
-    customer_profile.dart          # CustomerProfile with mood + loyaltyMultiplier
-    game_state.dart                # Immutable state: day, money, inventory, workspace, orders
-  data/
-    flower_data.dart               # 30 flowers in 4 unlock tiers; unlockedFlowers(day) helper
-    order_data.dart                # 32 orders + 15 customer profiles; generateDayOrders(day)
-  providers/
-    game_provider.dart             # GameNotifier — all game logic lives here
-    saved_state_provider.dart      # Provider<GameState?> seeded at ProviderScope for save restore
+  main.dart                   # Boots services, loads save, picks tutorial vs level map
+  config/feature_flags.dart   # The shipping surface (above)
+  models/                     # flower, bouquet_order, customer_profile, game_state, …
+  data/                       # flower_data, order_data, level_data, gem_data, …
+  providers/game_provider.dart  # GameNotifier — ALL game logic lives here
   services/
-    persistence_service.dart       # SharedPreferences save/load (day, money, inventory)
-  screens/
-    game_screen.dart               # Main screen: dark green garden bg, Stack layout (shelves → workspace → phone overlay)
-  widgets/
-    bouquet_workspace.dart         # Drag-target wooden table; enforces minFlowers/maxFlowers; 60px right margin for phone
-    inventory_shelf.dart           # Terracotta pot-on-shelf design; rows of 5; wilt warnings; draggable pots
-    customer_phone.dart            # Slide-out phone widget on right edge; shows customer DM + order details
-    order_panel.dart               # (unused — replaced by customer_phone.dart)
-    end_of_day_dialog.dart         # Two-page dialog: day summary → restock shop
-    restock_shop.dart              # Shop widget: buy flowers, see freshness, see locked previews
-    sparkle_overlay.dart           # Confetti animation on "great" bouquet result
-  theme/
-    app_theme.dart                 # AppColors + AppTheme (garden greens, terracotta pots, wood shelf palette)
+    persistence_service.dart  # SharedPreferences save/load
+    analytics_service.dart    # No-op seam; swap `instance` for a real backend
+    iap_service.dart          # No-op seam; gem purchases (no billing SDK wired)
+    audio_service.dart        # Silently no-ops until assets/audio/ has files
+    notification_service.dart # Opt-in daily reminder (off by default)
+    ad_service.dart           # Disabled; refuses to run on placeholder IDs
+  screens/                    # play_screen + level_map_screen are the live core
+  widgets/                    # ambient_petals, end_of_day_dialog, memory_popup, …
+  theme/app_theme.dart
 ```
 
----
-
-## Core Game Loop
-
-1. **Flowers** have `vibes` (e.g. romantic, elegant, fresh) and `cost` and `wiltsAfterDays`.
-2. **Orders** require specific vibe combinations. The player reads the customer's hint to guess what vibes to target.
-3. **Scoring** (`BouquetOrder.score()`): compares bouquet vibes to required vibes as a ratio. ≥80% → great (+30% bonus × loyalty); ≥50% → good (base × loyalty); <50% → poor (40% base, no loyalty bonus).
-4. **Day ends** when all orders are served → `EndOfDayDialog` shows summary → `RestockShop` lets player spend money on flowers → `startNextDay()` processes wilting and advances the day counter.
-5. **Wilting**: `inventoryDayAdded[flowerId]` tracks when stock was added. On `startNextDay()`, any flower where `(currentDay - addedDay) >= wiltsAfterDays` is removed from inventory.
+Screens/widgets not in the live flow above exist only for flagged-off systems.
 
 ---
 
-## Flower Unlock Tiers
+## Core loop
 
-| Tier | Unlocks on Day | Examples |
-|------|---------------|----------|
-| 1    | Day 1         | Rose, Daisy, Lily, Sunflower, Lavender, Tulip, Carnation, Wildflower, Baby's Breath, Marigold, Zinnia, Eucalyptus, Fern, Freesia |
-| 2    | Day 3         | Orchid, Gerbera, Snapdragon, Cosmos, Hyacinth, Chrysanthemum, Statice, Sweet Pea |
-| 3    | Day 6         | Peony, Ranunculus, Lisianthus, Thistle, Berry Branch, Wisteria, Anemone |
-| 4    | Day 10        | Protea |
+1. **Flowers** have `vibes`, `cost`, `wiltsAfterDays`; some are `isFiller` (greens).
+2. **Orders** require vibe combinations; the customer's hint is the clue.
+3. **Scoring** (`BouquetOrder.score()`): matched/required ratio × `loyaltyMultiplier`. ≥80% → great (+30%); ≥50% → good; <50% → poor (40%, no loyalty). Mystery orders score on distinct species instead.
+4. **Day ends** when all orders are served → summary → market restock → `startNextDay()`.
+5. **Wilting**: `inventoryDayAdded[flowerId]` tracks freshness; expired stock is removed on day advance.
 
-Use `unlockedFlowers(int day)` from `flower_data.dart` to get the available list for any given day.
+### Economy — treat as load-bearing
 
----
+Star goals in `level_data.dart` were derived from expected per-level earnings (`star2` ≈ all-Good, `star3` ≈ 0.90 × all-Great) so 3★ demands mostly-Great play. `test/sim_test.dart` runs a greedy bot through all 20 levels and asserts the campaign total stays in **[24, 50]/60** — if you change payments, costs, or star goals, re-run it and re-tune.
 
-## Economy
+**Do not casually change:** `star2Earnings`/`star3Earnings`, `basePayment`, flower `cost`, decor cost, restock amounts, `loyaltyMultiplier`.
 
-- Starting money: **$120**, starting inventory: ~3–5 of each Tier 1 flower.
-- Inventory is **persistent between days** — flowers used are gone, wilted flowers disappear automatically.
-- Players must visit the **Restock Shop** (end-of-day) to replenish stock by spending money.
-- `restockSpentToday` tracks the day's restock spend; `dayProfit = dayEarnings - restockSpentToday`.
-- Goal: **stay profitable**. Spending too much on restocking or getting poor results loses money.
+Every `VibeTag` must be carried by at least one non-event flower, or orders needing it become unwinnable. `sim_test.dart` guards this too.
 
----
+### Gems (premium currency)
 
-## Key State Fields (GameState)
+Bought with real money, **never earned from play**, so the coin economy is unaffected for non-paying players. Spent only on time-savers: instant restock, freshness reset, challenge reroll (`gem_data.dart`).
 
-| Field | Type | Purpose |
-|-------|------|---------|
-| `day` | int | Current day number |
-| `money` | int | Player's cash |
-| `inventory` | Map<String, int> | flowerId → quantity in stock |
-| `inventoryDayAdded` | Map<String, int> | flowerId → day the stock was last added (for wilting) |
-| `restockSpentToday` | int | Money spent in shop this session |
-| `dayOrders` | List<BouquetOrder> | Orders for this day |
-| `currentOrderIndex` | int | Which order is active |
-| `bouquetWorkspace` | List<Flower> | Flowers currently in the workspace |
-| `completedToday` | List<(BouquetOrder, int)> | (order, earned) pairs |
-| `dayEnded` | bool | True when all orders are served |
+`IapService` defaults to `UnavailableIap`, which **refuses every purchase** — no billing SDK is wired. `DebugIap` (kDebugMode only) exists for testing. Going live needs store products, a billing plugin, and **server-side receipt validation**.
 
----
-
-## GameNotifier Key Methods
-
-| Method | What it does |
-|--------|-------------|
-| `addFlowerToWorkspace(id)` | Moves flower from inventory → workspace; enforces `maxFlowers` |
-| `removeFlowerFromWorkspace(i)` | Returns flower at index back to inventory |
-| `clearWorkspace()` | Returns all workspace flowers to inventory |
-| `submitBouquet()` | Scores current bouquet, earns money, advances order index |
-| `restockFlower(id, qty)` | Buys stock from shop, deducts money, resets freshness clock |
-| `startNextDay()` | Processes wilting, advances day, generates new orders, auto-saves |
-| `freshnessRemaining(id)` | Days until a flower wilts (null if not in stock) |
-| `isNearlyWilted(id)` | True if ≤1 day of freshness remains |
+⚠️ `GameState` is rebuilt from scratch in `startNextDay()` and `startLevel()`. Any new long-lived field (like `gems`) **must be carried through both**, or it silently resets.
 
 ---
 
 ## Persistence
 
-`PersistenceService` saves `day`, `money`, `inventory`, and `inventoryDayAdded` to SharedPreferences as JSON. State is saved automatically on `restockFlower()` and `startNextDay()`. On boot, `main.dart` loads the save and seeds `savedGameStateProvider` so `GameNotifier.build()` restores from it.
+`PersistenceService` saves to SharedPreferences. New fields must default gracefully (`prefs.getInt(key) ?? 0`) so old saves still load.
+
+⚠️ `loadState()` deliberately **preserves the save on a parse failure** and starts the session fresh. It used to call `clearSave()`, which silently destroyed all progress on any schema change. Don't reintroduce that.
 
 ---
 
-## Conventions & Notes
+## Conventions
 
-- All state mutations go through `GameNotifier` — widgets never mutate state directly.
-- `withValues(alpha: x)` is used throughout instead of `withOpacity` (Flutter 3.27+ API).
-- Flowers in the inventory shelf show a wilt warning badge (`⚠️`) when ≤2 days of freshness remain.
-- The `starterFlowers` alias in `flower_data.dart` equals `allFlowers` for backward compatibility.
-- Order count per day scales as `3 + (day - 1).clamp(0, 5)` — so Day 1 = 3 orders, Day 6+ = 8 orders.
+- All state mutations go through `GameNotifier`; widgets never mutate state.
+- `withValues(alpha: x)`, not `withOpacity` (Flutter 3.27+).
+- Analytics goes through `AnalyticsService.instance` — never call an SDK directly.
+- Order count per day: `3 + (day-1).clamp(0,5)`, rising to 10 from day 15.
 
 ---
 
-## What's Working / What's Not (as of last update)
+## Assets (all degrade gracefully — the app runs without them)
 
-✅ All fixes and redesign applied:
-- Economy loop: inventory persists, restock shop functional, profit/loss tracked
-- Loyalty multiplier applied in scoring for regular customers
-- Wilting system fully wired (tracks per-flower freshness, removes expired stock on day advance)
-- maxFlowers enforced in workspace with visual "Full" indicator
-- Flower unlock progression (4 tiers, gates premium flowers behind day milestones)
-- Persistence via shared_preferences (auto-saves on restock and day advance)
-- Full UI redesign: dark garden green background, terracotta pot inventory shelves, wooden edge strip, bouquet workspace as wooden table
-- Customer DM phone widget (`customer_phone.dart`): slides out from right edge, shows chat bubble with hint + vibe chips; auto-expands on new order
-- Tutorial / onboarding (`tutorial_screen.dart`): 5-step Lily & Bud walkthrough, grants starter reward on completion
-- Difficulty-tuned order generation: 4 tiers (`_earlyOrders`, `_midOrders`, `_lateOrders`, `_premiumOrders`) gated by day; mystery orders inject every 3–4 days late game
-- Sound & haptics infrastructure: `AudioService` singleton fully wired; haptics in inventory shelf; **audio `.mp3` files still need to be dropped into `assets/audio/`**
-- Filler / greens mechanic: `eucalyptus`, `fern`, `babys_breath`, `statice` marked as `isFiller: true`; green pot style in inventory shelf; 🌿 counter badge in workspace header; 5% scoring bonus (10% on `prefersGreens` orders) when ≥1 filler + ≥3 non-filler flowers are submitted
+- `assets/flowers/<flowerId>.png` — 256×256 transparent. Emoji fallback until present.
+- `assets/audio/*.mp3` — silent until present.
+- `assets/characters/lily.png`, `bud.png`.
 
-## UI Layout (game_screen.dart)
+---
 
-```
-Scaffold > SparkleOverlay > Container(green gradient) > SafeArea > Stack:
-  ├─ Column:
-  │   ├─ _TopBar                (brown gradient header: title, day chip, money chip)
-  │   ├─ AnimatedSwitcher       (result banner: fades/sizes in below top bar)
-  │   ├─ SizedBox(172)          (InventoryShelf — terracotta pots on wooden shelves)
-  │   ├─ _WoodenEdge            (18px wood-grain strip separating shelves from workspace)
-  │   └─ Expanded               (_WorkspaceSection: BouquetWorkspace + SubmitBar)
-  └─ Positioned(right:0)        (CustomerPhone — floating slide-out, centred vertically)
-```
+## Status
 
-## Flower image assets
+Phases 0–5 of `SHIP_PLAN.md` are largely done: vibe fixes, scope cut, economy rebalance, code-only atmosphere polish, retention hooks, and release signing/ads compliance.
 
-Drop PNG files into `assets/flowers/` named exactly by flower ID (e.g. `rose.png`, `daisy.png`).
-Recommended: 256×256 px, transparent background. The app shows emoji as a fallback until a PNG exists.
-See `assets/flowers/README.md` for the full filename list.
-
-## Audio assets
-
-Drop `.mp3` files into `assets/audio/`. The app runs silently without them — no crashes.
-See `assets/audio/README.md` for the full filename list and recommended specs.
-
-🔲 Remaining to implement:
-- Nothing left from the original list — all four items are now done.
+Outstanding: audio + flower art + portraits + app icon, real store/IAP/analytics backends, privacy policy & Data Safety form, `targetSdk` 36, then soft launch.

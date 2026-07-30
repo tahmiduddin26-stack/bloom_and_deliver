@@ -12,17 +12,16 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^2.6.1
-  riverpod_annotation: ^2.6.1
   google_fonts: ^6.2.1
   shared_preferences: ^2.3.0
 
   # Tier 7 — Polish & retention
-  flutter_local_notifications: ^17.2.4   # push/local notifications
+  flutter_local_notifications: ^17.2.4   # opt-in daily reminder
   audioplayers: ^6.1.0                   # ambient sounds, jingles
-  share_plus: ^10.1.4                    # bouquet share card
-  path_provider: ^2.1.5                  # temp file for share image
 
-  # Ads
+  # Ads — currently disabled via Features.ads. The SDK still ships in the
+  # binary and can collect an advertising ID, so it must stay declared on the
+  # Data Safety form until this dependency is removed outright.
   google_mobile_ads: ^5.1.0             # AdMob banner
 
 dev_dependencies:
