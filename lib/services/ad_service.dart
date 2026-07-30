@@ -51,7 +51,18 @@ class AdService {
 
   /// Call once in main() before runApp. Initialises the Mobile Ads SDK and
   /// loads the first banner.
+  /// True while the production unit IDs are still the `ca-app-pub-XXXX/XXXX`
+  /// placeholders. Loading those fails at runtime and shipping them breaks
+  /// AdMob policy, so the service refuses to run until they are replaced.
+  static bool get hasPlaceholderIds => _bannerAdUnitId.contains('XXXX');
+
   Future<void> init() async {
+    if (hasPlaceholderIds) {
+      debugPrint(
+          'AdService: placeholder ad unit IDs — ads disabled. Set real IDs '
+          'from admob.google.com before enabling Features.ads.');
+      return;
+    }
     try {
       await MobileAds.instance.initialize();
       _loadBanner();

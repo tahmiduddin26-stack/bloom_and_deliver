@@ -29,6 +29,16 @@ abstract final class Features {
   static bool upgrades = false;
   static bool achievements = false;
 
+  /// AdMob banners. Off for launch, deliberately:
+  ///   * no live screen shows a banner (the only one died with GameScreen), so
+  ///     initialising the SDK bought nothing but a privacy-disclosure burden;
+  ///   * `ad_service.dart` still holds placeholder unit IDs, which fail to load;
+  ///   * gems are now the monetisation, and a cozy game keeps more goodwill
+  ///     without ads.
+  /// Turn on only after real AdMob unit IDs are in place AND the Data Safety
+  /// form is updated to match.
+  static bool ads = false;
+
   // ── Kept on ─────────────────────────────────────────────────────────────
   /// Vibe notebook — the collection axis (Phase 4 retention). The player is
   /// already accumulating `vibeDiscoveries` in the live flow; the notebook gives

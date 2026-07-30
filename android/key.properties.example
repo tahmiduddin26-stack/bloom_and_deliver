@@ -1,0 +1,17 @@
+# Release signing configuration — COPY to `key.properties` and fill in.
+#
+# `key.properties` and the keystore itself are git-ignored and must NEVER be
+# committed. Keep the .jks file outside the repository, and keep a backup:
+# losing the upload key means you can no longer update the app on Google Play.
+#
+# Generate an upload keystore with:
+#   keytool -genkey -v -keystore ~/upload-keystore.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# Then build an App Bundle (Play requires AAB, not APK):
+#   flutter build appbundle --release
+
+storeFile=/absolute/path/to/upload-keystore.jks
+storePassword=your-store-password
+keyAlias=upload
+keyPassword=your-key-password
