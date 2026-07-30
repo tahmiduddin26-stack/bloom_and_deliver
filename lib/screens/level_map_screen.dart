@@ -16,6 +16,7 @@ import '../widgets/daily_challenges_strip.dart';
 import '../widgets/reputation_board.dart';
 import '../widgets/seasonal_banner.dart';
 import '../widgets/story_arc_dialog.dart';
+import 'gem_shop_screen.dart';
 import 'market_screen.dart';
 import 'play_screen.dart';
 import 'shop_decor_screen.dart';
@@ -163,6 +164,7 @@ class _LevelMapScreenState extends ConsumerState<LevelMapScreen> {
                 totalStars: state.totalStars,
                 nextLevel: nextLevel,
                 loginStreak: state.loginStreak,
+                gems: state.gems,
                 onTownMap: _openTownMap,
               ),
               // Today's challenges (rewards pay out while playing)
@@ -302,6 +304,7 @@ class _MapHeader extends StatelessWidget {
   final int totalStars;
   final int nextLevel;
   final int loginStreak;
+  final int gems;
   final VoidCallback onTownMap;
 
   const _MapHeader({
@@ -309,6 +312,7 @@ class _MapHeader extends StatelessWidget {
     required this.totalStars,
     required this.nextLevel,
     required this.loginStreak,
+    required this.gems,
     required this.onTownMap,
   });
 
@@ -367,6 +371,11 @@ class _MapHeader extends StatelessWidget {
           _HeaderChip(emoji: '⭐', label: '$totalStars'),
           const SizedBox(width: 6),
           _HeaderChip(emoji: '🪙', label: '\$$money'),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () => openGemShop(context, source: 'level_map'),
+            child: _HeaderChip(emoji: '💎', label: '$gems'),
+          ),
           const SizedBox(width: 6),
           const _ReminderBell(),
           if (Features.vibeNotebook) ...[

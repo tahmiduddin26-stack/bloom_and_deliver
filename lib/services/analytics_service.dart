@@ -39,6 +39,19 @@ abstract class AnalyticsService {
 
   void friendshipLevelUp(String customerId, int level) => logEvent(
       'friendship_level_up', {'customer': customerId, 'level': level});
+
+  // ── Monetisation ────────────────────────────────────────────────────────
+  /// A gem sink was used. [sink] is a stable slug, e.g. 'instant_restock'.
+  void gemsSpent(String sink, int amount) =>
+      logEvent('gems_spent', {'sink': sink, 'amount': amount});
+
+  /// A store purchase completed. Log only after payment is confirmed.
+  void gemsPurchased(String productId, int gems) =>
+      logEvent('gems_purchased', {'product_id': productId, 'gems': gems});
+
+  /// The gem shop was opened — [source] says which entry point led there.
+  void gemShopOpened(String source) =>
+      logEvent('gem_shop_opened', {'source': source});
 }
 
 /// Default implementation: does nothing. Swap out `AnalyticsService.instance`

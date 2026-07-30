@@ -4,6 +4,7 @@ import '../data/big_orders_data.dart';
 import '../data/daily_challenges_data.dart';
 import '../data/delivery_data.dart';
 import '../data/flower_data.dart';
+import '../data/gem_data.dart';
 import '../data/level_data.dart';
 import '../data/order_data.dart';
 import '../data/seasonal_events_data.dart';
@@ -528,7 +529,9 @@ class GameNotifier extends Notifier<GameState> {
   // ── Tier 7 — Onboarding reward ───────────────────────────────────────────────
 
   /// Called once when the tutorial finishes. Grants a starter pack:
-  /// +$50 bonus coins, 2 peonies, 2 orchids, 1 ranunculus.
+  /// +$50 bonus coins, 2 peonies, 2 orchids, 1 ranunculus, and a small pouch of
+  /// gems so the player owns the premium currency before ever being asked to
+  /// buy it.
   void claimTutorialReward() {
     final inv = Map<String, int>.from(state.inventory);
     final dayAdded = Map<String, int>.from(state.inventoryDayAdded);
@@ -538,10 +541,82 @@ class GameNotifier extends Notifier<GameState> {
     }
     state = state.copyWith(
       money: state.money + 50,
+      gems: state.gems + kTutorialGemGift,
       inventory: inv,
       inventoryDayAdded: dayAdded,
     );
     PersistenceService.saveState(state);
+  }
+
+  // ── Gems (premium currency) ─────────────────────────────────────────────────
+  //
+  // Gems only ever enter the wallet from a confirmed store purchase or the
+  // one-off tutorial gift — never from play — so the coin economy stays exactly
+  // as balanced for a player who never spends.
+
+  /// Credit [amount] gems. Call only after the store confirms payment (or for
+  /// the tutorial gift).
+  void grantGems(int amount) {
+    if (amount <= 0) return;
+    state = state.copyWith(gems: state.gems + amount);
+    PersistenceService.saveState(state);
+  }
+
+  /// Deduct [cost] gems. Returns false (and changes nothing) if too poor.
+  bool _spendGems(int cost) {
+    if (cost <= 0 || state.gems < cost) return false;
+    state = state.copyWith(gems: state.gems - cost);
+    return true;
+  }
+
+  /// Instantly top every unlocked flower up to a full shelf. Saves the player a
+  /// market run; grants no coins.
+  bool gemInstantRestock() {
+    if (!_spendGems(kGemCostInstantRestock)) return false;
+    const shelfTarget = 5;
+    final inv = Map<String, int>.from(state.inventory);
+    final dayAdded = Map<String, int>.from(state.inventoryDayAdded);
+    for (final f in unlockedFlowers(state.day)) {
+      if ((inv[f.id] ?? 0) < shelfTarget) {
+        inv[f.id] = shelfTarget;
+        dayAdded[f.id] = state.day; // arrives fresh
+      }
+    }
+    state = state.copyWith(inventory: inv, inventoryDayAdded: dayAdded);
+    PersistenceService.saveState(state);
+    AnalyticsService.instance.gemsSpent('instant_restock', kGemCostInstantRestock);
+    return true;
+  }
+
+  /// Reset the freshness clock on everything in stock — nothing wilts tonight.
+  bool gemFreshWater() {
+    if (!_spendGems(kGemCostFreshWater)) return false;
+    final dayAdded = Map<String, int>.from(state.inventoryDayAdded);
+    state.inventory.forEach((id, qty) {
+      if (qty > 0) dayAdded[id] = state.day;
+    });
+    state = state.copyWith(inventoryDayAdded: dayAdded);
+    PersistenceService.saveState(state);
+    AnalyticsService.instance.gemsSpent('fresh_water', kGemCostFreshWater);
+    return true;
+  }
+
+  /// Swap today's three challenges for a different set. Progress on the old set
+  /// is discarded; rewards themselves are unchanged.
+  bool gemRerollChallenges() {
+    if (!_spendGems(kGemCostRerollChallenges)) return false;
+    final salt = state.dailyChallenges.fold<int>(
+          1,
+          (acc, c) => acc + c.id.hashCode.abs() % 97,
+        ) +
+        state.totalOrdersServed;
+    state = state.copyWith(
+      dailyChallenges: generateDailyChallenges(state.day, salt: salt),
+    );
+    PersistenceService.saveState(state);
+    AnalyticsService.instance
+        .gemsSpent('reroll_challenges', kGemCostRerollChallenges);
+    return true;
   }
 
   // ── Tier 3 — Login streak ─────────────────────────────────────────────────────
@@ -736,6 +811,7 @@ class GameNotifier extends Notifier<GameState> {
     state = GameState(
       day: nextDay,
       money: state.money,
+      gems: state.gems, // purchased currency must survive the day rollover
       inventory: inventory,
       inventoryDayAdded: dayAdded,
       restockSpentToday: 0,
@@ -802,6 +878,7 @@ class GameNotifier extends Notifier<GameState> {
     state = GameState(
       day: level,
       money: state.money,
+      gems: state.gems, // purchased currency must survive replaying a level
       inventory: state.inventory,
       inventoryDayAdded: state.inventoryDayAdded,
       restockSpentToday: 0,

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../data/flower_data.dart';
+import '../data/gem_data.dart';
 import '../models/flower.dart';
 import '../providers/game_provider.dart';
 import '../services/analytics_service.dart';
@@ -49,7 +50,8 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     'meet_customer',
     'build_bouquet',
     'result',
-    'ready',
+    'gems_gift',
+    'map_intro',
   ];
 
   static const _gradients = [
@@ -57,8 +59,11 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     [Color(0xFFF1FFF5), Color(0xFFE8F5E9)],
     [Color(0xFFFFFDE7), Color(0xFFFFF8E1)],
     [Color(0xFFFDEFF4), Color(0xFFFCE4EC)],
+    [Color(0xFFF3EFFF), Color(0xFFEDE7F6)],
     [Color(0xFFF5F0FF), Color(0xFFF3E5F5)],
   ];
+
+  static const _lastStep = 5;
 
   @override
   void initState() {
@@ -90,11 +95,11 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     AnalyticsService.instance.tutorialStep(next, _stepNames[next]);
   }
 
-  String get _primaryLabel => switch (_step) {
-        2 => 'Submit  🎀',
-        4 => "Let's Bloom!  🌸",
-        _ => 'Next  →',
-      };
+  String get _primaryLabel {
+    if (_step == 2) return 'Submit  🎀';
+    if (_step == _lastStep) return 'Open Level 1  🌸';
+    return 'Next  →';
+  }
 
   bool get _primaryEnabled => _step != 2 || _bouquetReady;
 
@@ -105,7 +110,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
       HapticFeedback.mediumImpact();
       AnalyticsService.instance.tutorialFirstBouquetSubmitted();
       _goToStep(3);
-    } else if (_step == 4) {
+    } else if (_step == _lastStep) {
       _finish();
     } else {
       _goToStep(_step + 1);
@@ -222,14 +227,10 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
               'matches the vibe, the bigger the tip. Regular customers who keep '
               'coming back tip even more!',
         );
+      case 4:
+        return const _GemGiftStep();
       default:
-        return const _DialogStep(
-          character: GameCharacter.lily,
-          message:
-              'After each day, restock at the market. 🌺\n\nRarer blooms unlock '
-              'as you grow and pay the biggest tips. I\'ve popped a few premium '
-              'flowers and some coins in your shop to start you off. Ready?',
-        );
+        return const _MapIntroStep();
     }
   }
 
@@ -267,6 +268,193 @@ class _DialogStep extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Gem gift step ─────────────────────────────────────────────────────────────
+
+class _GemGiftStep extends StatelessWidget {
+  const _GemGiftStep();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _FloatWrap(
+            child: Container(
+              width: 132,
+              height: 132,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF7E57C2).withValues(alpha: 0.12),
+                border: Border.all(
+                  color: const Color(0xFF7E57C2).withValues(alpha: 0.35),
+                  width: 3,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7E57C2).withValues(alpha: 0.25),
+                    blurRadius: 40,
+                    spreadRadius: 8,
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Text('💎', style: TextStyle(fontSize: 62)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+          _SpeechCard(
+            isLily: true,
+            message:
+                'A little housewarming gift — $kTutorialGemGift gems! 💎\n\n'
+                'Gems are for when you\'re in a hurry: restock the whole shop '
+                'instantly, keep your flowers from wilting, or redraw your daily '
+                'challenges.\n\nYou never need them to finish a level — the '
+                'coins you earn will do just fine.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Map intro step ────────────────────────────────────────────────────────────
+
+class _MapIntroStep extends StatelessWidget {
+  const _MapIntroStep();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _FloatWrap(
+            child: _CharacterCircle(
+              character: GameCharacter.lily,
+              isLily: true,
+              size: 120,
+            ),
+          ),
+          const SizedBox(height: 14),
+          // Miniature of the level map so the next screen is already familiar.
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    _MapNode(label: '1', state: _NodeState.current),
+                    _MapTrail(),
+                    _MapNode(label: '2', state: _NodeState.locked),
+                    _MapTrail(),
+                    _MapNode(label: '3', state: _NodeState.locked),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Each flower on the map is a day in the shop. Finish one and '
+                  'the next opens up.\n\nEvery level scores ⭐ 1–3 stars — earn '
+                  'more on a day to earn more stars, and replay any day to beat '
+                  'your best.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.nunito(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.45,
+                    color: AppColors.brownDark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Level 1 is waiting — let\'s open the shop! 🌸',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: AppColors.gardenGreenDark,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _NodeState { current, locked }
+
+class _MapNode extends StatelessWidget {
+  final String label;
+  final _NodeState state;
+
+  const _MapNode({required this.label, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isCurrent = state == _NodeState.current;
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: isCurrent
+            ? const LinearGradient(
+                colors: [Color(0xFFFF8FB1), Color(0xFFEC407A)],
+              )
+            : null,
+        color: isCurrent ? null : const Color(0xFFE0E0E0),
+        border: Border.all(
+          color: isCurrent ? const Color(0xFFEC407A) : const Color(0xFFBDBDBD),
+          width: 2,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          isCurrent ? label : '🔒',
+          style: GoogleFonts.nunito(
+            fontSize: isCurrent ? 16 : 13,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapTrail extends StatelessWidget {
+  const _MapTrail();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 26,
+        height: 3,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF48FB1).withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      );
 }
 
 // ── Meet-the-customer step ────────────────────────────────────────────────────

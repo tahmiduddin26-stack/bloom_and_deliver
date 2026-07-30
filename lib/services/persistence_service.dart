@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/big_orders_data.dart';
@@ -18,6 +19,7 @@ import '../models/shop_upgrades.dart';
 
 const _kDay = 'game_day';
 const _kMoney = 'game_money';
+const _kGems = 'game_gems';
 const _kInventory = 'game_inventory';
 const _kInventoryDayAdded = 'game_inventory_day_added';
 
@@ -65,6 +67,7 @@ class PersistenceService {
 
     await prefs.setInt(_kDay, state.day);
     await prefs.setInt(_kMoney, state.money);
+    await prefs.setInt(_kGems, state.gems);
     await prefs.setString(_kInventory, jsonEncode(state.inventory));
     await prefs.setString(
         _kInventoryDayAdded, jsonEncode(state.inventoryDayAdded));
@@ -145,6 +148,8 @@ class PersistenceService {
     try {
       final day = prefs.getInt(_kDay)!;
       final money = prefs.getInt(_kMoney)!;
+      // Older saves predate gems — default to 0 rather than failing the load.
+      final gems = prefs.getInt(_kGems) ?? 0;
 
       // ── Inventory ──────────────────────────────────────────────────────────
       final rawInv = prefs.getString(_kInventory);
@@ -320,6 +325,7 @@ class PersistenceService {
       return GameState(
         day: day,
         money: money,
+        gems: gems,
         inventory: inventory,
         inventoryDayAdded: inventoryDayAdded,
         restockSpentToday: 0,
@@ -355,8 +361,13 @@ class PersistenceService {
         allTimeFlowerUse: allTimeFlowerUse,
         levelStars: levelStars,
       );
-    } catch (_) {
-      await clearSave();
+    } catch (e) {
+      // A parse failure must NEVER destroy the player's save. Previously this
+      // called clearSave(), so one bad field — or any schema change that made an
+      // old save unreadable — silently deleted all progress. Leave the data on
+      // disk (a later build, or a fix, can still recover it) and just start this
+      // session fresh instead.
+      debugPrint('loadState failed — save PRESERVED, starting fresh: $e');
       return null;
     }
   }

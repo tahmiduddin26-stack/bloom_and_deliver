@@ -12,6 +12,12 @@ class GameState {
   // ── Core ─────────────────────────────────────────────────────────────────────
   final int day;
   final int money;
+
+  /// Premium currency. Bought with real money (never earned from play, so the
+  /// coin economy and its star-goal balance are completely unaffected) and
+  /// spent only on time-savers — see [GameNotifier.spendGems].
+  final int gems;
+
   final Map<String, int> inventory; // flowerId -> quantity
   final Map<String, int> inventoryDayAdded;
   final int restockSpentToday;
@@ -116,6 +122,7 @@ class GameState {
   const GameState({
     required this.day,
     required this.money,
+    this.gems = 0,
     required this.inventory,
     required this.inventoryDayAdded,
     this.restockSpentToday = 0,
@@ -210,6 +217,7 @@ class GameState {
   GameState copyWith({
     int? day,
     int? money,
+    int? gems,
     Map<String, int>? inventory,
     Map<String, int>? inventoryDayAdded,
     int? restockSpentToday,
@@ -255,6 +263,7 @@ class GameState {
       GameState(
         day: day ?? this.day,
         money: money ?? this.money,
+        gems: gems ?? this.gems,
         inventory: inventory ?? this.inventory,
         inventoryDayAdded: inventoryDayAdded ?? this.inventoryDayAdded,
         restockSpentToday: restockSpentToday ?? this.restockSpentToday,

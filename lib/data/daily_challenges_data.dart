@@ -67,13 +67,18 @@ const _pool = [
 
 /// Returns 3 distinct challenges seeded by [gameDay].
 /// Uses prime multipliers to spread picks across the pool.
-List<DailyChallenge> generateDailyChallenges(int gameDay) {
+///
+/// [salt] shifts the seed so the same day can yield a different set — used by
+/// the gem-funded reroll. It only changes *which* templates are picked; every
+/// challenge's reward value is untouched.
+List<DailyChallenge> generateDailyChallenges(int gameDay, {int salt = 0}) {
   final n = _pool.length;
   final picked = <int>{};
   final primes = [3, 7, 13, 17, 23, 29];
 
   for (var p = 0; picked.length < 3 && p < primes.length * 3; p++) {
-    final idx = ((gameDay * primes[p % primes.length]) + p * 11) % n;
+    final idx =
+        (((gameDay + salt * 37) * primes[p % primes.length]) + p * 11) % n;
     picked.add(idx);
   }
 
