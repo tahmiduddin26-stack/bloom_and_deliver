@@ -26,7 +26,59 @@ import '../services/analytics_service.dart';
 import '../services/persistence_service.dart';
 import 'saved_state_provider.dart';
 
+/// A descriptive split of one order's payout, so the result card can show *why*
+/// a bouquet paid what it did.
+///
+/// Every field is derived from values the payout already produced — the parts
+/// sum to [total] exactly. It is a read-out, never an input to the economy.
+class EarningsBreakdown {
+  /// The order's advertised base payment.
+  final int base;
+
+  /// Adjustment for how well the bouquet matched (Great/Good/Poor), or the
+  /// creativity bonus on a mystery order. Negative on a Poor result.
+  final int resultBonus;
+
+  /// Extra from a regular customer's loyalty multiplier.
+  final int loyaltyBonus;
+
+  /// Extra from shop upgrades.
+  final int upgradeBonus;
+
+  /// Extra for having completed a vibe-notebook chapter.
+  final int vibeBonus;
+
+  /// Extra for including filler greens.
+  final int greensBonus;
+
+  final int total;
+  final bool isMystery;
+
+  const EarningsBreakdown({
+    required this.base,
+    required this.resultBonus,
+    required this.loyaltyBonus,
+    required this.upgradeBonus,
+    required this.vibeBonus,
+    required this.greensBonus,
+    required this.total,
+    required this.isMystery,
+  });
+
+  /// The non-base parts worth naming, largest first, as (label, amount).
+  List<(String, int)> get namedParts => [
+        if (resultBonus != 0) (isMystery ? 'creativity' : 'match', resultBonus),
+        if (loyaltyBonus != 0) ('loyalty', loyaltyBonus),
+        if (upgradeBonus != 0) ('upgrades', upgradeBonus),
+        if (vibeBonus != 0) ('notebook', vibeBonus),
+        if (greensBonus != 0) ('greens', greensBonus),
+      ]..sort((a, b) => b.$2.compareTo(a.$2));
+}
+
 class GameNotifier extends Notifier<GameState> {
+  /// Breakdown of the most recent [submitBouquet] payout. Display only.
+  EarningsBreakdown? lastEarnings;
+
   @override
   GameState build() {
     final saved = ref.read(savedGameStateProvider);
@@ -149,6 +201,38 @@ class GameNotifier extends Notifier<GameState> {
     // Total earned for this order — bonuses included so day earnings,
     // stats, and the money balance all agree.
     final earned = upgradedEarned + vibeBonus + greensBonus;
+
+    // ── Explain the payout ───────────────────────────────────────────────────────
+    // Purely descriptive: split `earned` into the parts that produced it so the
+    // result card can teach what pays more. Every term is a delta between values
+    // already computed above, so the parts always sum back to `earned` exactly —
+    // this changes no payment.
+    final basePay = order.basePayment;
+    final int resultBonus;
+    final int loyaltyBonus;
+    if (order.isMystery) {
+      // Mystery orders score on variety and ignore loyalty entirely.
+      resultBonus = baseEarned - basePay;
+      loyaltyBonus = 0;
+    } else {
+      final beforeLoyalty = switch (result) {
+        OrderResult.great => (basePay * 1.3).round(),
+        OrderResult.good => basePay,
+        _ => (basePay * 0.4).round(),
+      };
+      resultBonus = beforeLoyalty - basePay;
+      loyaltyBonus = baseEarned - beforeLoyalty;
+    }
+    lastEarnings = EarningsBreakdown(
+      base: basePay,
+      resultBonus: resultBonus,
+      loyaltyBonus: loyaltyBonus,
+      upgradeBonus: upgradedEarned - baseEarned,
+      vibeBonus: vibeBonus,
+      greensBonus: greensBonus,
+      total: earned,
+      isMystery: order.isMystery,
+    );
 
     final updatedOrder = order.copyWith(result: result);
     final updatedOrders = List<BouquetOrder>.from(state.dayOrders);

@@ -42,6 +42,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   // Transient result overlay
   OrderResult? _resultShown;
   int _resultEarned = 0;
+  EarningsBreakdown? _resultBreakdown;
 
   // Celebration popup queues (achievements, friendship memories)
   String? _activeAchievementId;
@@ -82,6 +83,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     setState(() {
       _resultShown = result;
       _resultEarned = earned;
+      _resultBreakdown = ref.read(gameProvider.notifier).lastEarnings;
       _showConfetti = result == OrderResult.great;
       if (justCompleted.isNotEmpty) _challengeDone = justCompleted.first;
     });
@@ -269,7 +271,11 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                 ),
                 // Result overlay
                 if (_resultShown != null)
-                  _ResultOverlay(result: _resultShown!, earned: _resultEarned),
+                  _ResultOverlay(
+                    result: _resultShown!,
+                    earned: _resultEarned,
+                    breakdown: _resultBreakdown,
+                  ),
                 // Achievement popup
                 if (Features.achievements && _activeAchievementId != null)
                   Positioned(
@@ -1335,13 +1341,66 @@ class _ChallengeToast extends StatelessWidget {
   }
 }
 
+/// "base 30 · match +9 · loyalty +5 · greens +2" — the parts that made up the
+/// payout, largest first. Descriptive only; the numbers come straight from the
+/// payout that already happened.
+class _PayBreakdown extends StatelessWidget {
+  final EarningsBreakdown breakdown;
+
+  const _PayBreakdown({required this.breakdown});
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = breakdown.namedParts;
+    final chips = <String>[
+      'base ${breakdown.base}',
+      for (final (label, amount) in parts)
+        '$label ${amount > 0 ? '+' : '−'}${amount.abs()}',
+    ];
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 260),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 6,
+        runSpacing: 2,
+        children: [
+          for (var i = 0; i < chips.length; i++) ...[
+            Text(
+              chips[i],
+              style: GoogleFonts.nunito(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: i == 0 ? AppColors.brownLight : AppColors.gardenGreenDark,
+              ),
+            ),
+            if (i < chips.length - 1)
+              Text(
+                '·',
+                style: GoogleFonts.nunito(
+                  fontSize: 11.5,
+                  color: AppColors.brownLight,
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 // ── Result overlay ─────────────────────────────────────────────────────────────
 
 class _ResultOverlay extends StatelessWidget {
+  final EarningsBreakdown? breakdown;
   final OrderResult result;
   final int earned;
 
-  const _ResultOverlay({required this.result, required this.earned});
+  const _ResultOverlay({
+    required this.result,
+    required this.earned,
+    this.breakdown,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1397,6 +1456,11 @@ class _ResultOverlay extends StatelessWidget {
                         color: const Color(0xFF4CAF50),
                       ),
                     ),
+                  // Why it paid that much — teaches what earns more.
+                  if (breakdown != null && earned > 0) ...[
+                    const SizedBox(height: 4),
+                    _PayBreakdown(breakdown: breakdown!),
+                  ],
                 ],
               ),
             ),
