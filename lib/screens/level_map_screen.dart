@@ -194,6 +194,19 @@ class _LevelMapScreenState extends ConsumerState<LevelMapScreen> {
                             ),
                             // Scattered garden doodles
                             ..._gardenDoodles(width, height),
+                            // Chapter markers, above the first node of each act
+                            for (var i = 0; i < nodeCount; i++)
+                              if (chapterStartingAt(i + 1) != null)
+                                Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  top: centers[i].dy - 96,
+                                  child: _ChapterMarker(
+                                    chapter: chapterStartingAt(i + 1)!,
+                                    reached: state.nextLevel >=
+                                        chapterStartingAt(i + 1)!.firstLevel,
+                                  ),
+                                ),
                             // Level nodes
                             for (var i = 0; i < nodeCount; i++)
                               _positionedNode(i + 1, centers[i], state),
@@ -411,6 +424,71 @@ class _MapHeader extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Names the act the next few nodes belong to, so a 20-level run reads as a
+/// story rather than a flat 1–20 list. Dimmed until the player reaches it.
+class _ChapterMarker extends StatelessWidget {
+  final ChapterDef chapter;
+  final bool reached;
+
+  const _ChapterMarker({required this.chapter, required this.reached});
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = reached ? Palette.action : AppColors.brownLight;
+    return Center(
+      child: Opacity(
+        opacity: reached ? 1 : 0.55,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: tint.withValues(alpha: 0.45), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.07),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${chapter.emoji}  CHAPTER ${chapter.number}',
+                style: GoogleFonts.nunito(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.1,
+                  color: tint,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                chapter.title,
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.inkBrown,
+                ),
+              ),
+              Text(
+                'Levels ${chapter.firstLevel}–${chapter.lastLevel}',
+                style: GoogleFonts.nunito(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.brownLight,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

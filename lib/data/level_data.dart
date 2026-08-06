@@ -225,6 +225,56 @@ const List<LevelDef> allLevels = [
 /// Total number of campaign levels.
 const int maxCampaignLevel = 20;
 
+/// A named act of the campaign. Display only — chapters group the 20-level run
+/// on the map so progress reads as a story rather than a flat list of numbers.
+class ChapterDef {
+  final int number;
+  final String title;
+  final String emoji;
+  final int firstLevel;
+  final int lastLevel;
+
+  const ChapterDef({
+    required this.number,
+    required this.title,
+    required this.emoji,
+    required this.firstLevel,
+    required this.lastLevel,
+  });
+}
+
+const List<ChapterDef> allChapters = [
+  ChapterDef(
+    number: 1,
+    title: 'Opening Day',
+    emoji: '🎀',
+    firstLevel: 1,
+    lastLevel: 7,
+  ),
+  ChapterDef(
+    number: 2,
+    title: 'Rival in Town',
+    emoji: '🏪',
+    firstLevel: 8,
+    lastLevel: 14,
+  ),
+  ChapterDef(
+    number: 3,
+    title: 'Full Bloom',
+    emoji: '💐',
+    firstLevel: 15,
+    lastLevel: 20,
+  ),
+];
+
+/// The chapter that begins at [level], or null if none starts there.
+ChapterDef? chapterStartingAt(int level) {
+  for (final c in allChapters) {
+    if (c.firstLevel == level) return c;
+  }
+  return null;
+}
+
 /// Look up a level definition (1-based). Days beyond 20 return an
 /// auto-generated endless-mode definition.
 LevelDef levelForDay(int day) {
