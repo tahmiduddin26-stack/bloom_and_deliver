@@ -168,6 +168,8 @@ class _MarketScreenState extends ConsumerState<MarketScreen>
                       money: state.money,
                       day: state.day,
                       spent: state.restockSpentToday,
+                      coversDays:
+                          ref.read(gameProvider.notifier).stockCoversDays(),
                     ),
                     // Green + cream striped awning
                     const _MarketAwning(),
@@ -314,15 +316,58 @@ class _FlashSaleBanner extends StatelessWidget {
 
 // ── Market header ─────────────────────────────────────────────────────────────
 
+/// "Stock covers 2 days of orders" — turns a shelf full of tiles into a single
+/// judgement the player can act on. Colour-coded so it reads without parsing.
+class _StockCoverBadge extends StatelessWidget {
+  final int days;
+
+  const _StockCoverBadge({required this.days});
+
+  @override
+  Widget build(BuildContext context) {
+    final (tint, label) = switch (days) {
+      0 => (AppColors.notifRed, 'Not enough for tomorrow'),
+      1 => (Palette.reward, 'Covers about 1 day'),
+      _ => (Palette.money, 'Covers about $days days'),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: tint.withValues(alpha: 0.75)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('🧺', style: TextStyle(fontSize: 11)),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: GoogleFonts.nunito(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+              color: AppColors.warmWhite,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MarketHeader extends StatelessWidget {
   final int money;
   final int day;
   final int spent;
+  final int coversDays;
 
   const _MarketHeader({
     required this.money,
     required this.day,
     required this.spent,
+    required this.coversDays,
   });
 
   @override
@@ -366,6 +411,9 @@ class _MarketHeader extends StatelessWidget {
                     color: AppColors.cream.withValues(alpha: 0.7),
                   ),
                 ),
+                const SizedBox(height: 4),
+                // The only question restocking really asks.
+                _StockCoverBadge(days: coversDays),
               ],
             ),
           ),

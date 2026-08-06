@@ -1197,6 +1197,20 @@ class GameNotifier extends Notifier<GameState> {
 
   bool get isAtMaxFlowers => state.bouquetWorkspace.length >= effectiveMaxFlowers();
 
+  /// Rough number of days the current shelf can supply, based on how many
+  /// customers arrive per day and the average order size at this tier.
+  ///
+  /// Read-only and deliberately approximate — it answers the only question the
+  /// market really poses ("is this enough?") without pretending to predict the
+  /// random order draw.
+  int stockCoversDays() {
+    final stems = state.inventory.values.fold<int>(0, (a, b) => a + b);
+    if (stems <= 0) return 0;
+    final perDay = ordersOnDay(state.day) * averageMinStems(state.day);
+    if (perDay <= 0) return 0;
+    return (stems / perDay).floor();
+  }
+
   /// Stock that will be lost to wilting when the day next advances, as
   /// flowerId → quantity.
   ///

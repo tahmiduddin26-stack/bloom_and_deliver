@@ -1006,15 +1006,28 @@ final List<BouquetOrder> mysteryOrderPool = [
 // Days 11–18: early + mid + late orders (premium unlocked)
 // Days 19–30: all tiers, with premium orders weighted heavily + mystery every 3 days
 
+/// Number of customers that arrive on [day], before any upgrade bonuses.
+/// Scales from 3 (day 1) to 8 (day 6+), then to 10 (day 15+).
+int ordersOnDay(int day) =>
+    day >= 15 ? 3 + (day - 1).clamp(0, 7) : 3 + (day - 1).clamp(0, 5);
+
+/// Average minimum stems across the orders that can appear on [day].
+///
+/// Mirrors the pool construction in [generateDayOrders], so an estimate built
+/// on it stays true as tiers unlock. Used to answer "how many days does my
+/// stock cover?" in the market.
+double averageMinStems(int day) {
+  final pool = <BouquetOrder>[..._earlyOrders];
+  if (day >= 3) pool.addAll(_midOrders);
+  if (day >= 8) pool.addAll(_lateOrders);
+  if (day >= 15) pool.addAll(_premiumOrders);
+  if (pool.isEmpty) return 4;
+  return pool.fold<int>(0, (sum, o) => sum + o.minFlowers) / pool.length;
+}
+
 /// [extraOrders] adds bonus customers (e.g. from the Display Window upgrade).
 List<BouquetOrder> generateDayOrders(int day, {int extraOrders = 0}) {
-  // Base order count scales from 3 (day 1) to 8 (day 6+), then to 10 (day 15+)
-  int count;
-  if (day >= 15) {
-    count = 3 + (day - 1).clamp(0, 7); // up to 10
-  } else {
-    count = 3 + (day - 1).clamp(0, 5); // up to 8
-  }
+  var count = ordersOnDay(day);
   count += extraOrders;
 
   // Build a pool weighted by day progress
