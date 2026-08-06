@@ -521,6 +521,12 @@ class _Header extends StatelessWidget {
 
 // ── Customer card ──────────────────────────────────────────────────────────────
 
+/// 1.10 → "1.1", 1.15 → "1.15", 1.00 → "1". Keeps the loyalty badge tidy.
+String _trimZeros(double v) => v
+    .toStringAsFixed(2)
+    .replaceFirst(RegExp(r'0+$'), '')
+    .replaceFirst(RegExp(r'\.$'), '');
+
 class _CustomerCard extends StatelessWidget {
   final BouquetOrder order;
   final List<Flower> workspace;
@@ -594,8 +600,27 @@ class _CustomerCard extends StatelessWidget {
                           ),
                         ),
                         if (order.customer.isRegular) ...[
-                          const SizedBox(width: 4),
-                          const Text('⭐', style: TextStyle(fontSize: 11)),
+                          const SizedBox(width: 6),
+                          // Name the actual multiplier: a regular is worth
+                          // something specific, not just a star.
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Palette.reward.withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: Palette.reward.withValues(alpha: 0.7)),
+                            ),
+                            child: Text(
+                              'REGULAR ×${_trimZeros(customer.loyaltyMultiplier)}',
+                              style: GoogleFonts.nunito(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF8A5514),
+                              ),
+                            ),
+                          ),
                         ],
                         const Spacer(),
                         Text(
@@ -645,24 +670,54 @@ class _CustomerCard extends StatelessWidget {
               ),
             )
           else
-            Wrap(
-              spacing: 5,
-              runSpacing: 5,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                for (final vibe in order.requiredVibes)
-                  _MatchChip(vibe: vibe, covered: covered.contains(vibe)),
-                const SizedBox(width: 2),
-                Text(
-                  '· ${order.minFlowers}–${order.maxFlowers} flowers · up to \$${(order.basePayment * 1.3).round()}',
-                  style: GoogleFonts.nunito(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.brownLight,
+                Expanded(
+                  child: Wrap(
+                    spacing: 5,
+                    runSpacing: 5,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      for (final vibe in order.requiredVibes)
+                        _MatchChip(
+                            vibe: vibe, covered: covered.contains(vibe)),
+                    ],
                   ),
+                ),
+                const SizedBox(width: 8),
+                // Max pay as one number the player can compare at a glance,
+                // rather than a clause at the end of a sentence.
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '\$${(order.basePayment * 1.3 * customer.loyaltyMultiplier).round()}',
+                      style: AppText.number(17, color: Palette.money),
+                    ),
+                    Text(
+                      'max pay',
+                      style: GoogleFonts.nunito(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.brownLight,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
+          const SizedBox(height: 6),
+          Text(
+            '${order.minFlowers}–${order.maxFlowers} stems'
+            '${order.prefersGreens ? ' · likes greens' : ''}',
+            style: GoogleFonts.nunito(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.brownLight,
+            ),
+          ),
           if (showLifeEvent) ...[
             const SizedBox(height: 10),
             _LifeEventBanner(
@@ -1007,7 +1062,7 @@ class _BouquetFlowerState extends State<_BouquetFlower>
 
 // ── Flower tray ────────────────────────────────────────────────────────────────
 
-class _FlowerTray extends ConsumerWidget {
+class _FlowerTray extends ConsumerStatefulWidget {
   final int day;
   final Map<String, int> inventory;
   final BouquetOrder order;
@@ -1019,11 +1074,29 @@ class _FlowerTray extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_FlowerTray> createState() => _FlowerTrayState();
+}
+
+class _FlowerTrayState extends ConsumerState<_FlowerTray> {
+  /// Show only flowers carrying a wanted vibe. On by default — with 30 flowers
+  /// unlocked, the shelf is the main source of friction in the core loop.
+  bool _matchesOnly = true;
+
+  @override
+  void didUpdateWidget(_FlowerTray old) {
+    super.didUpdateWidget(old);
+    // A new customer wants different things — start filtered again.
+    if (old.order.id != widget.order.id) _matchesOnly = true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final notifier = ref.read(gameProvider.notifier);
-    final flowers = unlockedFlowers(day);
-    final wanted =
-        order.isMystery ? <VibeTag>{} : order.requiredVibes.toSet();
+    final inventory = widget.inventory;
+    final flowers = unlockedFlowers(widget.day);
+    final wanted = widget.order.isMystery
+        ? <VibeTag>{}
+        : widget.order.requiredVibes.toSet();
 
     // In-stock first, matching flowers before the rest.
     final sorted = List<Flower>.from(flowers)
@@ -1036,34 +1109,105 @@ class _FlowerTray extends ConsumerWidget {
         return aMatch - bMatch;
       });
 
-    return Container(
-      height: 108,
-      margin: const EdgeInsets.fromLTRB(0, 8, 0, 4),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: sorted.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final flower = sorted[i];
-          final qty = inventory[flower.id] ?? 0;
-          final matches = flower.vibes.any(wanted.contains);
-          return _TrayPot(
-            flower: flower,
-            qty: qty,
-            matches: matches,
-            onAdd: qty > 0
-                ? () {
-                    HapticFeedback.selectionClick();
-                    AudioService.instance.play(GameSound.flowerDrop);
-                    notifier.addFlowerToWorkspace(flower.id);
-                  }
-                : null,
-          );
-        },
-      ),
+    bool isMatch(Flower f) => f.vibes.any(wanted.contains);
+    // Only count stock the player can actually use.
+    final usableMatches =
+        sorted.where((f) => isMatch(f) && (inventory[f.id] ?? 0) > 0).toList();
+
+    // Filtering is only offered when it would leave something to tap — a
+    // mystery order (no wanted vibes) or an empty shelf falls back to All.
+    final canFilter = wanted.isNotEmpty && usableMatches.isNotEmpty;
+    final filtered = canFilter && _matchesOnly;
+    final visible = filtered ? sorted.where(isMatch).toList() : sorted;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (canFilter)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+            child: Row(
+              children: [
+                _TrayFilterTab(
+                  label: 'Matches ${usableMatches.length}',
+                  selected: filtered,
+                  onTap: () => setState(() => _matchesOnly = true),
+                ),
+                const SizedBox(width: 6),
+                _TrayFilterTab(
+                  label: 'All ${sorted.length}',
+                  selected: !filtered,
+                  onTap: () => setState(() => _matchesOnly = false),
+                ),
+              ],
+            ),
+          ),
+        SizedBox(
+          height: 108,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: visible.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, i) {
+              final flower = visible[i];
+              final qty = inventory[flower.id] ?? 0;
+              return _TrayPot(
+                flower: flower,
+                qty: qty,
+                matches: isMatch(flower),
+                onAdd: qty > 0
+                    ? () {
+                        HapticFeedback.selectionClick();
+                        AudioService.instance.play(GameSound.flowerDrop);
+                        notifier.addFlowerToWorkspace(flower.id);
+                      }
+                    : null,
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
+}
+
+class _TrayFilterTab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TrayFilterTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: selected ? Palette.action : Colors.white.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? Palette.action
+                  : AppColors.brownLight.withValues(alpha: 0.4),
+            ),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.nunito(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              color: selected ? Colors.white : AppColors.brownDark,
+            ),
+          ),
+        ),
+      );
 }
 
 class _TrayPot extends StatelessWidget {
