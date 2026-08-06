@@ -180,8 +180,11 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       }
     });
 
-    // Achievement popups (one at a time)
+    // Achievement popups (one at a time). Gated: the achievements system is
+    // flagged off for launch, and its screen is unreachable, so its popups must
+    // not fire either — otherwise a cut system keeps interrupting play.
     ref.listen(gameProvider.select((s) => s.pendingAchievements), (prev, next) {
+      if (!Features.achievements) return;
       if (next.isNotEmpty && _activeAchievementId == null) {
         AudioService.instance.play(GameSound.notification);
         setState(() => _activeAchievementId = next.first);
@@ -268,7 +271,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                 if (_resultShown != null)
                   _ResultOverlay(result: _resultShown!, earned: _resultEarned),
                 // Achievement popup
-                if (_activeAchievementId != null)
+                if (Features.achievements && _activeAchievementId != null)
                   Positioned(
                     top: 0,
                     left: 0,
