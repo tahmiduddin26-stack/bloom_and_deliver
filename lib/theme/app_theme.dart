@@ -81,6 +81,176 @@ class AppColors {
   static const amaryllisCrimson = Color(0xFFB83A52); // Winter Blooms amaryllis
 }
 
+/// Core palette from the visual redesign.
+///
+/// Deliberately tiny: five colours that each carry one meaning, so a player can
+/// read a screen without reading words. Prefer these over the legacy
+/// [AppColors] entries when building or reworking a screen.
+///
+///   * [action] — the single pink call-to-action. **One per screen.**
+///   * [money]  — coins, earnings, anything the player banks.
+///   * [reward] — stars, gifts, bonuses.
+///   * [ink]    — text and outlines on light surfaces.
+///   * [surface] / [surfaceRaised] — page and card backgrounds.
+class Palette {
+  const Palette._();
+
+  static const action = Color(0xFFE1215F);
+  static const ink = Color(0xFF2E1A24);
+  static const money = Color(0xFF3E8E5A);
+  static const reward = Color(0xFFF5B93F);
+  static const surface = Color(0xFFFDEFF4);
+  static const surfaceRaised = Color(0xFFFFFDFB);
+}
+
+/// Type scale from the redesign.
+///
+/// Playfair for titles and results; Nunito 900 for any number the player
+/// compares, Nunito 700 for body copy. Numbers a player compares are never
+/// smaller than 14px — see [number].
+class AppText {
+  const AppText._();
+
+  /// Screen titles, results, level names.
+  static TextStyle title(double size, {Color color = Palette.ink}) =>
+      GoogleFonts.playfairDisplay(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: color,
+      );
+
+  /// Any number the player compares — minimum 14px, weight 900.
+  static TextStyle number(double size, {Color color = Palette.ink}) =>
+      GoogleFonts.nunito(
+        fontSize: size < 14 ? 14 : size,
+        fontWeight: FontWeight.w900,
+        color: color,
+      );
+
+  /// Button labels.
+  static TextStyle button(double size, {Color color = Colors.white}) =>
+      GoogleFonts.nunito(
+        fontSize: size,
+        fontWeight: FontWeight.w900,
+        color: color,
+      );
+
+  /// Body copy, hints, labels.
+  static TextStyle body(double size, {Color color = Palette.ink}) =>
+      GoogleFonts.nunito(
+        fontSize: size,
+        fontWeight: FontWeight.w700,
+        color: color,
+      );
+}
+
+/// A chunky button with a hard bottom shadow — never a gradient glow.
+///
+/// The shadow is a solid offset block (5–6px), which is what gives the UI its
+/// toy-like, pressable feel. Pressing sinks the button into its own shadow.
+class ChunkyButton extends StatefulWidget {
+  final String label;
+  final VoidCallback? onTap;
+  final Color color;
+  final Color textColor;
+  final double height;
+  final double fontSize;
+
+  /// Optional leading widget (an emoji or icon) shown before the label.
+  final Widget? leading;
+
+  const ChunkyButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.color = Palette.action,
+    this.textColor = Colors.white,
+    this.height = 56,
+    this.fontSize = 17,
+    this.leading,
+  });
+
+  @override
+  State<ChunkyButton> createState() => _ChunkyButtonState();
+}
+
+class _ChunkyButtonState extends State<ChunkyButton> {
+  static const _depth = 6.0;
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
+    final base = enabled ? widget.color : const Color(0xFFBFB4B8);
+    // The shadow is the same hue, darkened — a hard block, no blur.
+    final shade = Color.lerp(base, Colors.black, 0.28)!;
+    final sunk = _down && enabled;
+
+    return GestureDetector(
+      onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+      onTapUp: enabled ? (_) => setState(() => _down = false) : null,
+      onTapCancel: enabled ? () => setState(() => _down = false) : null,
+      onTap: widget.onTap,
+      child: SizedBox(
+        height: widget.height + _depth,
+        child: Stack(
+          children: [
+            // Shadow block
+            Positioned(
+              left: 0,
+              right: 0,
+              top: _depth,
+              child: Container(
+                height: widget.height,
+                decoration: BoxDecoration(
+                  color: shade,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+            ),
+            // Face
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 60),
+              left: 0,
+              right: 0,
+              top: sunk ? _depth : 0,
+              child: Container(
+                height: widget.height,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: base,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.leading != null) ...[
+                      widget.leading!,
+                      const SizedBox(width: 8),
+                    ],
+                    Flexible(
+                      child: Text(
+                        widget.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.button(
+                          widget.fontSize,
+                          color: enabled ? widget.textColor : Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class AppTheme {
   static ThemeData get theme => ThemeData(
         useMaterial3: true,
