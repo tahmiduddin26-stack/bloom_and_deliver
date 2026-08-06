@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../data/flower_data.dart';
 import '../data/level_data.dart';
 import '../models/bouquet_order.dart';
 import '../providers/game_provider.dart';
@@ -88,6 +89,7 @@ class _SummaryPage extends ConsumerWidget {
             earnings: earnings,
           ),
           _EarningsBanner(earnings: earnings, total: state.money),
+          _WiltWarning(doomed: ref.read(gameProvider.notifier).wiltingTonight()),
           Flexible(child: _OrderSummaryList(completed: completed)),
           _SummaryFooter(
             onGoToMarket: onGoToMarket,
@@ -103,6 +105,69 @@ class _SummaryPage extends ConsumerWidget {
                     state.activeBigOrder!.nextDayIndex != null)
                 ? state.activeBigOrder!.name
                 : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Names the stock that will be lost overnight — the one mechanic the player
+/// otherwise never sees. Shown before the market button precisely because it is
+/// still actionable: use them tonight, or sell them off at the market.
+class _WiltWarning extends StatelessWidget {
+  final Map<String, int> doomed;
+
+  const _WiltWarning({required this.doomed});
+
+  @override
+  Widget build(BuildContext context) {
+    if (doomed.isEmpty) return const SizedBox.shrink();
+
+    final names = doomed.entries
+        .map((e) => '${e.value}× ${flowerById[e.key]?.name ?? e.key}')
+        .toList();
+    final label = names.length <= 2
+        ? names.join(' and ')
+        : '${names.take(2).join(', ')} +${names.length - 2} more';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.potTerracotta.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.potTerracotta.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Text('🥀', style: TextStyle(fontSize: 20)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Wilting overnight',
+                  style: GoogleFonts.nunito(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.potTerracottaDark,
+                  ),
+                ),
+                Text(
+                  '$label — use them tonight or sell them at the market.',
+                  style: GoogleFonts.nunito(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.brownDark,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

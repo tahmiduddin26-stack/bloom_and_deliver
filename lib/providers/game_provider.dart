@@ -1113,6 +1113,33 @@ class GameNotifier extends Notifier<GameState> {
 
   bool get isAtMaxFlowers => state.bouquetWorkspace.length >= effectiveMaxFlowers();
 
+  /// Stock that will be lost to wilting when the day next advances, as
+  /// flowerId → quantity.
+  ///
+  /// Read-only, and deliberately mirrors the removal rule in [startNextDay]:
+  /// a flower expires once it has been in stock for `wiltsAfterDays` (plus any
+  /// freshness upgrade) days. Surfacing this on the end-of-day summary — while
+  /// the player still has a market visit left — turns an invisible loss into a
+  /// decision: use them tonight, or sell them off.
+  ///
+  /// If the wilt rule in [startNextDay] ever changes, change it here too.
+  Map<String, int> wiltingTonight() {
+    final doomed = <String, int>{};
+    final bonusDays = state.upgrades.freshnessBonusDays;
+    state.inventory.forEach((id, qty) {
+      if (qty <= 0) return;
+      final flower = flowerById[id];
+      if (flower == null) return;
+      final addedDay = state.inventoryDayAdded[id] ?? state.day;
+      // +1: we are predicting the state after the day advances.
+      final daysInStock = (state.day + 1) - addedDay;
+      if (daysInStock >= flower.wiltsAfterDays + bonusDays) {
+        doomed[id] = qty;
+      }
+    });
+    return doomed;
+  }
+
   int? freshnessRemaining(String flowerId) {
     final flower = flowerById[flowerId];
     if (flower == null) return null;
