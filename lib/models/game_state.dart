@@ -13,9 +13,7 @@ class GameState {
   final int day;
   final int money;
 
-  /// Premium currency. Bought with real money (never earned from play, so the
-  /// coin economy and its star-goal balance are completely unaffected) and
-  /// spent only on time-savers — see [GameNotifier.spendGems].
+  /// Gems earned from new journey stars or optional purchases, spent on shortcuts.
   final int gems;
 
   final Map<String, int> inventory; // flowerId -> quantity
@@ -40,7 +38,8 @@ class GameState {
 
   // ── Daily challenges ──────────────────────────────────────────────────────────
   final List<DailyChallenge> dailyChallenges;
-  final int challengeGameDay; // which game day these challenges were generated for
+  final int
+  challengeGameDay; // which game day these challenges were generated for
 
   // ── Tier 2 — Narrative & friendship ──────────────────────────────────────────
 
@@ -166,14 +165,15 @@ class GameState {
   // ── Derived ── Level campaign helpers ────────────────────────────────────────
 
   /// Highest completed level (0 if none).
-  int get highestCompletedLevel =>
-      levelStars.keys.isEmpty ? 0 : levelStars.keys.reduce((a, b) => a > b ? a : b);
+  int get highestCompletedLevel => levelStars.keys.isEmpty
+      ? 0
+      : levelStars.keys.reduce((a, b) => a > b ? a : b);
 
   /// The next level available to play.
   int get nextLevel => highestCompletedLevel + 1;
 
   /// True if [level] can be played (completed before, or the next one up).
-  bool isLevelUnlocked(int level) => level <= nextLevel;
+  bool isLevelUnlocked(int level) => level >= 1 && level <= nextLevel;
 
   /// Best stars earned on [level], or 0 if not completed.
   int starsForLevel(int level) => levelStars[level] ?? 0;
@@ -184,7 +184,9 @@ class GameState {
   // ── Derived ───────────────────────────────────────────────────────────────────
 
   BouquetOrder? get currentOrder =>
-      currentOrderIndex < dayOrders.length ? dayOrders[currentOrderIndex] : null;
+      currentOrderIndex >= 0 && currentOrderIndex < dayOrders.length
+      ? dayOrders[currentOrderIndex]
+      : null;
 
   bool get allOrdersServed => currentOrderIndex >= dayOrders.length;
   int get ordersRemaining => dayOrders.length - currentOrderIndex;
@@ -202,8 +204,7 @@ class GameState {
   String activeDecorId(String categoryKey, String defaultId) =>
       activeDecor[categoryKey] ?? defaultId;
 
-  bool ownsDecor(String id) =>
-      purchasedDecor.contains(id);
+  bool ownsDecor(String id) => purchasedDecor.contains(id);
 
   String? get favoriteFlower {
     if (allTimeFlowerUse.isEmpty) return null;
@@ -259,56 +260,54 @@ class GameState {
     int? bestDayEarnings,
     Map<String, int>? allTimeFlowerUse,
     Map<int, int>? levelStars,
-  }) =>
-      GameState(
-        day: day ?? this.day,
-        money: money ?? this.money,
-        gems: gems ?? this.gems,
-        inventory: inventory ?? this.inventory,
-        inventoryDayAdded: inventoryDayAdded ?? this.inventoryDayAdded,
-        restockSpentToday: restockSpentToday ?? this.restockSpentToday,
-        dayOrders: dayOrders ?? this.dayOrders,
-        currentOrderIndex: currentOrderIndex ?? this.currentOrderIndex,
-        bouquetWorkspace: bouquetWorkspace ?? this.bouquetWorkspace,
-        completedToday: completedToday ?? this.completedToday,
-        dayEnded: dayEnded ?? this.dayEnded,
-        xp: xp ?? this.xp,
-        upgrades: upgrades ?? this.upgrades,
-        unlockedAchievements: unlockedAchievements ?? this.unlockedAchievements,
-        totalOrdersServed: totalOrdersServed ?? this.totalOrdersServed,
-        totalEarnings: totalEarnings ?? this.totalEarnings,
-        greatStreak: greatStreak ?? this.greatStreak,
-        servedVibeIds: servedVibeIds ?? this.servedVibeIds,
-        dailyChallenges: dailyChallenges ?? this.dailyChallenges,
-        challengeGameDay: challengeGameDay ?? this.challengeGameDay,
-        customerFriendship: customerFriendship ?? this.customerFriendship,
-        pendingMemories: pendingMemories ?? this.pendingMemories,
-        reputationScore: reputationScore ?? this.reputationScore,
-        pendingRankUp: clearPendingRankUp
-            ? null
-            : (pendingRankUp ?? this.pendingRankUp),
-        pendingAchievements: pendingAchievements ?? this.pendingAchievements,
-        pendingStoryChapterDay: clearPendingStoryChapter
-            ? null
-            : (pendingStoryChapterDay ?? this.pendingStoryChapterDay),
-        pendingReputationBoard:
-            pendingReputationBoard ?? this.pendingReputationBoard,
-        windowsillPlots: windowsillPlots ?? this.windowsillPlots,
-        pendingDeliveries: pendingDeliveries ?? this.pendingDeliveries,
-        loginStreak: loginStreak ?? this.loginStreak,
-        lastLoginDateMs: lastLoginDateMs ?? this.lastLoginDateMs,
-        vibeDiscoveries: vibeDiscoveries ?? this.vibeDiscoveries,
-        activeBigOrder: clearActiveBigOrder
-            ? null
-            : (activeBigOrder ?? this.activeBigOrder),
-        wholesalePending: wholesalePending ?? this.wholesalePending,
-        pendingSeasonalBanner:
-            pendingSeasonalBanner ?? this.pendingSeasonalBanner,
-        purchasedDecor: purchasedDecor ?? this.purchasedDecor,
-        activeDecor: activeDecor ?? this.activeDecor,
-        bouquetPresets: bouquetPresets ?? this.bouquetPresets,
-        bestDayEarnings: bestDayEarnings ?? this.bestDayEarnings,
-        allTimeFlowerUse: allTimeFlowerUse ?? this.allTimeFlowerUse,
-        levelStars: levelStars ?? this.levelStars,
-      );
+  }) => GameState(
+    day: day ?? this.day,
+    money: money ?? this.money,
+    gems: gems ?? this.gems,
+    inventory: inventory ?? this.inventory,
+    inventoryDayAdded: inventoryDayAdded ?? this.inventoryDayAdded,
+    restockSpentToday: restockSpentToday ?? this.restockSpentToday,
+    dayOrders: dayOrders ?? this.dayOrders,
+    currentOrderIndex: currentOrderIndex ?? this.currentOrderIndex,
+    bouquetWorkspace: bouquetWorkspace ?? this.bouquetWorkspace,
+    completedToday: completedToday ?? this.completedToday,
+    dayEnded: dayEnded ?? this.dayEnded,
+    xp: xp ?? this.xp,
+    upgrades: upgrades ?? this.upgrades,
+    unlockedAchievements: unlockedAchievements ?? this.unlockedAchievements,
+    totalOrdersServed: totalOrdersServed ?? this.totalOrdersServed,
+    totalEarnings: totalEarnings ?? this.totalEarnings,
+    greatStreak: greatStreak ?? this.greatStreak,
+    servedVibeIds: servedVibeIds ?? this.servedVibeIds,
+    dailyChallenges: dailyChallenges ?? this.dailyChallenges,
+    challengeGameDay: challengeGameDay ?? this.challengeGameDay,
+    customerFriendship: customerFriendship ?? this.customerFriendship,
+    pendingMemories: pendingMemories ?? this.pendingMemories,
+    reputationScore: reputationScore ?? this.reputationScore,
+    pendingRankUp: clearPendingRankUp
+        ? null
+        : (pendingRankUp ?? this.pendingRankUp),
+    pendingAchievements: pendingAchievements ?? this.pendingAchievements,
+    pendingStoryChapterDay: clearPendingStoryChapter
+        ? null
+        : (pendingStoryChapterDay ?? this.pendingStoryChapterDay),
+    pendingReputationBoard:
+        pendingReputationBoard ?? this.pendingReputationBoard,
+    windowsillPlots: windowsillPlots ?? this.windowsillPlots,
+    pendingDeliveries: pendingDeliveries ?? this.pendingDeliveries,
+    loginStreak: loginStreak ?? this.loginStreak,
+    lastLoginDateMs: lastLoginDateMs ?? this.lastLoginDateMs,
+    vibeDiscoveries: vibeDiscoveries ?? this.vibeDiscoveries,
+    activeBigOrder: clearActiveBigOrder
+        ? null
+        : (activeBigOrder ?? this.activeBigOrder),
+    wholesalePending: wholesalePending ?? this.wholesalePending,
+    pendingSeasonalBanner: pendingSeasonalBanner ?? this.pendingSeasonalBanner,
+    purchasedDecor: purchasedDecor ?? this.purchasedDecor,
+    activeDecor: activeDecor ?? this.activeDecor,
+    bouquetPresets: bouquetPresets ?? this.bouquetPresets,
+    bestDayEarnings: bestDayEarnings ?? this.bestDayEarnings,
+    allTimeFlowerUse: allTimeFlowerUse ?? this.allTimeFlowerUse,
+    levelStars: levelStars ?? this.levelStars,
+  );
 }

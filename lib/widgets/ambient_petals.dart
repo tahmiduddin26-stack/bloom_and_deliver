@@ -74,7 +74,7 @@ class _AmbientPetalsState extends State<AmbientPetals>
           if (!w.isFinite || !h.isFinite) return const SizedBox.shrink();
           return AnimatedBuilder(
             animation: _ctrl,
-            builder: (_, __) => Stack(
+            builder: (_, _) => Stack(
               children: [
                 for (final p in _petals) _positioned(p, w, h, _ctrl.value),
               ],

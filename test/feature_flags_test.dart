@@ -1,31 +1,34 @@
-// Release guard for the Phase 1 shipping surface.
-//
-// SHIP_PLAN Phase 1 cuts the reachable game down to: level map → play → market
-// → repeat, plus the decor money sink. Every other system is built but flagged
-// off until it ships as a post-launch content drop.
-//
-// This test is intentionally a tripwire: if someone flips a system on, they must
-// consciously update this expectation, which forces a deliberate scope decision
-// rather than an accidental one.
+// Tripwire for reachable places and deliberately hidden online features.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bloom_and_deliver/config/feature_flags.dart';
 
 void main() {
-  test('shipping surface: non-core systems are flagged off', () {
-    expect(Features.townMap, isFalse, reason: 'town map is post-launch');
-    expect(Features.wholesale, isFalse, reason: 'wholesale is post-launch');
-    expect(Features.bigOrders, isFalse, reason: 'big orders are post-launch');
-    expect(Features.deliveries, isFalse, reason: 'deliveries are post-launch');
+  test('commissions are playable and offline leaderboard stays hidden', () {
+    expect(Features.bigOrders, isTrue);
     expect(Features.leaderboard, isFalse, reason: 'leaderboard is post-launch');
-    expect(Features.shopStats, isFalse, reason: 'shop stats are post-launch');
-    expect(Features.shopInterior, isFalse, reason: 'shop interior is post-launch');
-    expect(Features.upgrades, isFalse, reason: 'upgrades are post-launch');
-    expect(Features.achievements, isFalse, reason: 'achievements are post-launch');
   });
 
-  test('kept on for launch', () {
-    expect(Features.shopDecor, isTrue, reason: 'decor is the Phase 2 money sink');
-    expect(Features.vibeNotebook, isTrue,
-        reason: 'notebook is the Phase 4 collection axis (level-map entry)');
+  test('journey places and shop collection are accessible', () {
+    expect(Features.townMap, isTrue);
+    expect(Features.wholesale, isTrue);
+    expect(Features.deliveries, isTrue);
+    expect(Features.shopInterior, isTrue);
+    expect(Features.shopStats, isTrue);
+    expect(Features.achievements, isTrue);
+    expect(
+      Features.upgrades,
+      isTrue,
+      reason: 'coins buy lasting shop improvements',
+    );
+    expect(
+      Features.shopDecor,
+      isTrue,
+      reason: 'decor is the Phase 2 money sink',
+    );
+    expect(
+      Features.vibeNotebook,
+      isTrue,
+      reason: 'notebook is the Phase 4 collection axis (level-map entry)',
+    );
   });
 }

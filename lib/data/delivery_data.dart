@@ -1,7 +1,10 @@
 import 'dart:math';
 
+import 'flower_data.dart';
 import '../models/delivery_mission.dart';
 import '../models/flower.dart';
+
+const deliveryUnlockDay = 4;
 
 // ── Mission pool ──────────────────────────────────────────────────────────────
 
@@ -11,7 +14,8 @@ const List<DeliveryMission> _allMissions = [
     location: "St. Mary's Hospital",
     emoji: '🏥',
     description: 'A patient in Ward 3 is feeling down. Cheer them up!',
-    hint: '"Something bright and hopeful — they need a reason to smile today 💛"',
+    hint:
+        '"Something bright and hopeful — they need a reason to smile today 💛"',
     requiredVibes: [VibeTag.cheerful, VibeTag.fresh],
     minFlowers: 3,
     maxFlowers: 5,
@@ -37,7 +41,8 @@ const List<DeliveryMission> _allMissions = [
     location: 'Rosewood Wedding Venue',
     emoji: '💒',
     description: 'Table centrepieces for an evening reception.',
-    hint: '"Romantic and elegant — it\'s our big day and everything has to be perfect 🌹"',
+    hint:
+        '"Romantic and elegant — it\'s our big day and everything has to be perfect 🌹"',
     requiredVibes: [VibeTag.romantic, VibeTag.elegant],
     minFlowers: 5,
     maxFlowers: 8,
@@ -76,7 +81,8 @@ const List<DeliveryMission> _allMissions = [
     location: 'Meadowbrook Primary',
     emoji: '🏫',
     description: 'Flowers for the Year 6 science garden display.',
-    hint: '"Wild and natural-looking — the kids are learning about ecosystems 🌿"',
+    hint:
+        '"Wild and natural-looking — the kids are learning about ecosystems 🌿"',
     requiredVibes: [VibeTag.wild, VibeTag.natural, VibeTag.fresh],
     minFlowers: 4,
     maxFlowers: 7,
@@ -128,7 +134,8 @@ const List<DeliveryMission> _allMissions = [
     location: 'Willowmere Library',
     emoji: '📚',
     description: "Flowers for the children's reading corner.",
-    hint: '"Something soft and natural — we want the kids to feel calm and curious 🌱"',
+    hint:
+        '"Something soft and natural — we want the kids to feel calm and curious 🌱"',
     requiredVibes: [VibeTag.natural, VibeTag.delicate, VibeTag.fresh],
     minFlowers: 3,
     maxFlowers: 5,
@@ -144,7 +151,16 @@ const List<DeliveryMission> _allMissions = [
 /// Uses the day as a seed so missions are consistent within a day.
 List<DeliveryMission> generateDeliveries(int day) {
   final rng = Random(day * 31 + 7);
-  final shuffled = List<DeliveryMission>.from(_allMissions)..shuffle(rng);
+  final availableVibes = unlockedFlowers(
+    day,
+  ).expand((flower) => flower.vibes).toSet();
+  final shuffled =
+      _allMissions
+          .where(
+            (mission) => mission.requiredVibes.every(availableVibes.contains),
+          )
+          .toList()
+        ..shuffle(rng);
   final count = 2 + (rng.nextBool() ? 1 : 0); // 2 or 3
   return shuffled.take(count).toList();
 }

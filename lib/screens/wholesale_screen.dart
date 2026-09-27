@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-
-import '../config/feature_flags.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../config/feature_flags.dart';
 import '../data/flower_data.dart';
+import '../data/wholesale_data.dart';
 import '../models/flower.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/flower_image.dart';
 
+/// Prepaid bundles arrive when the next level starts.
 class WholesaleScreen extends ConsumerStatefulWidget {
   const WholesaleScreen({super.key});
 
@@ -19,91 +19,55 @@ class WholesaleScreen extends ConsumerStatefulWidget {
   ConsumerState<WholesaleScreen> createState() => _WholesaleScreenState();
 }
 
-class _WholesaleScreenState extends ConsumerState<WholesaleScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _slideCtrl;
-  late final Animation<Offset> _slideIn;
-
-  // Local cart: flowerId → quantity to order
+class _WholesaleScreenState extends ConsumerState<WholesaleScreen> {
+  // The local cart stores bundles; game state stores individual stems.
   final Map<String, int> _cart = {};
 
-  @override
-  void initState() {
-    super.initState();
-    _slideCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _slideIn = Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic));
-    _slideCtrl.forward();
-  }
-
-  @override
-  void dispose() {
-    _slideCtrl.dispose();
-    super.dispose();
-  }
-
-  int _wholesalePrice(Flower f) => (f.cost * 0.7).round().clamp(1, f.cost - 1);
+  int get _selectedPacks => _cart.values.fold(0, (sum, packs) => sum + packs);
 
   int get _cartTotal => _cart.entries.fold(
-      0, (sum, e) => sum + _wholesalePrice(flowerById[e.key]!) * e.value);
+    0,
+    (sum, entry) =>
+        sum + wholesalePackPrice(flowerById[entry.key]!) * entry.value,
+  );
 
-  void _increment(String id) {
-    HapticFeedback.selectionClick();
-    setState(() => _cart[id] = (_cart[id] ?? 0) + 1);
-  }
-
-  void _decrement(String id) {
-    HapticFeedback.selectionClick();
+  void _changePacks(String id, int delta, int pendingStems) {
+    final next = (_cart[id] ?? 0) + delta;
+    if (next < 0 ||
+        (delta > 0 &&
+            pendingStems + (_selectedPacks + 1) * wholesalePackSize >
+                wholesaleMaxPacksPerDay * wholesalePackSize)) {
+      return;
+    }
     setState(() {
-      final cur = _cart[id] ?? 0;
-      if (cur <= 1) {
+      if (next == 0) {
         _cart.remove(id);
       } else {
-        _cart[id] = cur - 1;
+        _cart[id] = next;
       }
     });
   }
 
-  void _placeOrders() {
+  void _placeOrder() {
     if (_cart.isEmpty) return;
-    final notifier = ref.read(gameProvider.notifier);
-    final money = ref.read(gameProvider).money;
-
-    if (_cartTotal > money) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "Not enough coins! You need \$$_cartTotal but only have \$$money.",
-            style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
-          ),
-          backgroundColor: AppColors.potTerracottaDark,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-      return;
+    final quantities = _cart.map(
+      (id, packs) => MapEntry(id, packs * wholesalePackSize),
+    );
+    final placed = ref
+        .read(gameProvider.notifier)
+        .placeWholesaleCart(quantities);
+    if (!mounted) return;
+    if (placed) {
+      AudioService.instance.play(GameSound.coin);
+      setState(_cart.clear);
     }
-
-    HapticFeedback.mediumImpact();
-    AudioService.instance.play(GameSound.coin);
-    for (final entry in _cart.entries) {
-      final flower = flowerById[entry.key]!;
-      final qty = entry.value;
-      final cost = _wholesalePrice(flower) * qty;
-      notifier.placeWholesaleOrder(entry.key, qty, cost);
-    }
-    setState(() => _cart.clear());
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '📦 Order placed! Flowers arrive tomorrow morning.',
-          style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+          placed
+              ? 'Bundle booked! Fresh flowers arrive at the next level.'
+              : 'That order could not be placed. Check your coins and bundle limit.',
         ),
-        backgroundColor: AppColors.gardenGreenMid,
-        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -111,386 +75,211 @@ class _WholesaleScreenState extends ConsumerState<WholesaleScreen>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(gameProvider);
-    final unlocked = unlockedFlowers(state.day)
-        .where((f) => !f.isEventExclusive)
-        .toList();
-    final pending = state.wholesalePending;
+    final pendingStems = wholesalePendingStems(state.wholesalePending);
+    final packsLeft =
+        ((wholesaleMaxPacksPerDay * wholesalePackSize - pendingStems) /
+                wholesalePackSize)
+            .floor()
+            .clamp(0, wholesaleMaxPacksPerDay) -
+        _selectedPacks;
+    final flowers = unlockedFlowers(
+      state.day,
+    ).where((flower) => !flower.isEventExclusive).toList();
+    final canPlace = _cart.isNotEmpty && _cartTotal <= state.money;
 
     return Scaffold(
-      body: SlideTransition(
-        position: _slideIn,
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF2D4A35), Color(0xFF1A2E20)],
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                _WholesaleHeader(money: state.money),
-                // Pending orders banner
-                if (pending.isNotEmpty)
-                  _PendingBanner(pending: pending),
-                // Info strip
-                _InfoStrip(),
-                // Flower list
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
-                    itemCount: unlocked.length,
-                    itemBuilder: (context, i) {
-                      final flower = unlocked[i];
-                      final qty = _cart[flower.id] ?? 0;
-                      final price = _wholesalePrice(flower);
-                      return _WholesaleRow(
-                        flower: flower,
-                        wholesalePrice: price,
-                        qty: qty,
-                        onIncrement: () => _increment(flower.id),
-                        onDecrement: () => _decrement(flower.id),
-                      );
-                    },
-                  ),
-                ),
-                // Footer
-                _WholesaleFooter(
-                  cartTotal: _cartTotal,
-                  cartCount: _cart.values.fold(0, (a, b) => a + b),
-                  money: state.money,
-                  onPlace: _cart.isEmpty ? null : _placeOrders,
-                  onClose: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
+      backgroundColor: AppColors.cream,
+      appBar: AppBar(
+        backgroundColor: AppColors.gardenGreenDark,
+        foregroundColor: Colors.white,
+        title: Text(
+          'Wholesale Depot',
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w900),
         ),
       ),
-    );
-  }
-}
-
-// ── Header ────────────────────────────────────────────────────────────────────
-
-class _WholesaleHeader extends StatelessWidget {
-  final int money;
-  const _WholesaleHeader({required this.money});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1A3020), Color(0xFF2E5438)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
+      body: Column(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.arrow_back_ios_new,
-                  color: Colors.white, size: 16),
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Text('🏭', style: TextStyle(fontSize: 22)),
-          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
               children: [
-                Text(
-                  'Wholesale Supplier',
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.warmWhite,
+                Container(
+                  padding: const EdgeInsets.all(17),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFE2AE),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.cartoonInk, width: 2),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Plan tomorrow’s blooms',
+                        style: GoogleFonts.nunito(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.gardenGreenDark,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        'Bundles cost less and arrive fresh at the next level. Need flowers now? Visit the market.',
+                        style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.brownDark,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '$wholesalePackSize stems per bundle  •  $wholesaleMaxPacksPerDay bundles a day',
+                        style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.gardenGreenDark,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  '30% off — arrives next morning',
-                  style: GoogleFonts.nunito(
-                    fontSize: 11,
-                    color: AppColors.mint.withValues(alpha: 0.8),
-                    fontWeight: FontWeight.w600,
+                if (state.wholesalePending.isNotEmpty) ...[
+                  const SizedBox(height: 13),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCEBC6),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: AppColors.cartoonInk,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'On the way for next level',
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.gardenGreenDark,
+                          ),
+                        ),
+                        Text(
+                          state.wholesalePending.entries
+                              .map(
+                                (entry) =>
+                                    '${entry.value} ${flowerById[entry.key]?.name ?? entry.key}',
+                              )
+                              .join('  •  '),
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.brownDark,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.mint.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.mint.withValues(alpha: 0.4)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('💵', style: TextStyle(fontSize: 13)),
-                const SizedBox(width: 4),
-                Text(
-                  '\$$money',
-                  style: GoogleFonts.nunito(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.warmWhite,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Pending orders banner ─────────────────────────────────────────────────────
-
-class _PendingBanner extends StatelessWidget {
-  final Map<String, int> pending;
-  const _PendingBanner({required this.pending});
-
-  @override
-  Widget build(BuildContext context) {
-    final lines = pending.entries.map((e) {
-      final name = flowerById[e.key]?.name ?? e.key;
-      return '${e.value}× $name';
-    }).join('  •  ');
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      color: AppColors.gardenGreenMid.withValues(alpha: 0.25),
-      child: Row(
-        children: [
-          const Text('📦', style: TextStyle(fontSize: 14)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Arriving tomorrow: $lines',
-              style: GoogleFonts.nunito(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppColors.mint,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Info strip ────────────────────────────────────────────────────────────────
-
-class _InfoStrip extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-      ),
-      child: Row(
-        children: [
-          _InfoChip('🕐', 'Arrives next morning'),
-          const SizedBox(width: 12),
-          _InfoChip('💸', '30% cheaper than market'),
-          const SizedBox(width: 12),
-          _InfoChip('⚠️', 'No same-day access'),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  final String emoji;
-  final String label;
-  const _InfoChip(this.emoji, this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 11)),
-        const SizedBox(width: 3),
-        Text(
-          label,
-          style: GoogleFonts.nunito(
-            fontSize: 9.5,
-            color: Colors.white.withValues(alpha: 0.55),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Flower row ────────────────────────────────────────────────────────────────
-
-class _WholesaleRow extends StatelessWidget {
-  final Flower flower;
-  final int wholesalePrice;
-  final int qty;
-  final VoidCallback onIncrement;
-  final VoidCallback onDecrement;
-
-  const _WholesaleRow({
-    required this.flower,
-    required this.wholesalePrice,
-    required this.qty,
-    required this.onIncrement,
-    required this.onDecrement,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isInCart = qty > 0;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: isInCart
-            ? AppColors.gardenGreenMid.withValues(alpha: 0.18)
-            : Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isInCart
-              ? AppColors.gardenGreenMid.withValues(alpha: 0.5)
-              : Colors.white.withValues(alpha: 0.08),
-        ),
-      ),
-      child: Row(
-        children: [
-          FlowerImage(flower: flower, size: 36),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  flower.name,
-                  style: GoogleFonts.nunito(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
+                ],
+                const SizedBox(height: 17),
                 Row(
                   children: [
-                    Text(
-                      '\$${flower.cost}',
-                      style: GoogleFonts.nunito(
-                        fontSize: 10,
-                        color: Colors.white38,
-                        decoration: TextDecoration.lineThrough,
-                        decorationColor: Colors.white38,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '\$$wholesalePrice ea',
-                      style: GoogleFonts.nunito(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.mint,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: AppColors.gardenGreenMid.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
+                    Expanded(
                       child: Text(
-                        '30% off',
+                        'Choose bundles',
                         style: GoogleFonts.nunito(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.mint,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.gardenGreenDark,
                         ),
+                      ),
+                    ),
+                    Text(
+                      '$packsLeft left',
+                      style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.gardenGreenDark,
                       ),
                     ),
                   ],
                 ),
-                if (qty > 0)
-                  Text(
-                    'Subtotal: \$${wholesalePrice * qty}',
-                    style: GoogleFonts.nunito(
-                      fontSize: 10,
-                      color: AppColors.gardenGreenMid,
-                      fontWeight: FontWeight.w700,
+                const SizedBox(height: 9),
+                for (final flower in flowers)
+                  _BundleCard(
+                    flower: flower,
+                    packs: _cart[flower.id] ?? 0,
+                    stock: state.inventory[flower.id] ?? 0,
+                    canAdd: packsLeft > 0,
+                    onAdd: () => _changePacks(flower.id, 1, pendingStems),
+                    onRemove: () => _changePacks(flower.id, -1, pendingStems),
+                  ),
+              ],
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              decoration: const BoxDecoration(
+                color: AppColors.warmWhite,
+                border: Border(
+                  top: BorderSide(color: AppColors.cartoonInk, width: 2),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$_selectedPacks / $wholesaleMaxPacksPerDay bundles',
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.gardenGreenDark,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '\$$_cartTotal / \$${state.money}',
+                        style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.gardenGreenDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 9),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: canPlace ? _placeOrder : null,
+                      icon: Icon(
+                        Icons.local_shipping_rounded,
+                        color: canPlace ? Colors.white : AppColors.brownLight,
+                      ),
+                      label: Text(
+                        _cart.isEmpty
+                            ? 'Choose a bundle'
+                            : canPlace
+                            ? 'Place order for \$$_cartTotal'
+                            : 'Need more coins',
+                        style: TextStyle(
+                          color: canPlace ? Colors.white : AppColors.brownLight,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(49),
+                        backgroundColor: AppColors.gardenGreenDark,
+                        foregroundColor: Colors.white,
+                        textStyle: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
-          ),
-          // Qty stepper
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _StepBtn(
-                icon: Icons.remove,
-                enabled: qty > 0,
-                onTap: onDecrement,
-              ),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: qty > 0
-                      ? AppColors.gardenGreenMid.withValues(alpha: 0.25)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$qty',
-                  style: GoogleFonts.nunito(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: qty > 0 ? Colors.white : Colors.white38,
-                  ),
-                ),
-              ),
-              _StepBtn(
-                icon: Icons.add,
-                enabled: true,
-                onTap: onIncrement,
-              ),
-            ],
           ),
         ],
       ),
@@ -498,157 +287,112 @@ class _WholesaleRow extends StatelessWidget {
   }
 }
 
-class _StepBtn extends StatelessWidget {
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback onTap;
+class _BundleCard extends StatelessWidget {
+  final Flower flower;
+  final int packs;
+  final int stock;
+  final bool canAdd;
+  final VoidCallback onAdd;
+  final VoidCallback onRemove;
 
-  const _StepBtn({
-    required this.icon,
-    required this.enabled,
-    required this.onTap,
+  const _BundleCard({
+    required this.flower,
+    required this.packs,
+    required this.stock,
+    required this.canAdd,
+    required this.onAdd,
+    required this.onRemove,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: enabled
-              ? Colors.white.withValues(alpha: 0.12)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: enabled
-                ? Colors.white.withValues(alpha: 0.2)
-                : Colors.white.withValues(alpha: 0.06),
-          ),
-        ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: enabled ? Colors.white : Colors.white24,
-        ),
-      ),
-    );
-  }
-}
-
-// ── Footer ────────────────────────────────────────────────────────────────────
-
-class _WholesaleFooter extends StatelessWidget {
-  final int cartTotal;
-  final int cartCount;
-  final int money;
-  final VoidCallback? onPlace;
-  final VoidCallback onClose;
-
-  const _WholesaleFooter({
-    required this.cartTotal,
-    required this.cartCount,
-    required this.money,
-    required this.onPlace,
-    required this.onClose,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final canAfford = money >= cartTotal;
-    final hasItems = cartCount > 0;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A2E20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Cart summary
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  hasItems ? '$cartCount stem${cartCount == 1 ? '' : 's'} ordered' : 'Nothing selected',
-                  style: GoogleFonts.nunito(
-                    fontSize: 10,
-                    color: Colors.white54,
-                    fontWeight: FontWeight.w600,
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 9),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: packs > 0 ? const Color(0xFFFFDDE1) : AppColors.warmWhite,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: AppColors.cartoonInk, width: 1.5),
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            FlowerImage(flower: flower, size: 43),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    flower.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.nunito(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.gardenGreenDark,
+                    ),
                   ),
-                ),
-                Text(
-                  hasItems ? '-\$$cartTotal' : '\$0',
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: hasItems && !canAfford
-                        ? AppColors.potTerracottaDark
-                        : Colors.white,
+                  Text(
+                    '\$${wholesalePackPrice(flower)} for $wholesalePackSize stems  ·  market \$${flower.cost * wholesalePackSize}',
+                    style: GoogleFonts.nunito(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.brownDark,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          // Place order button
-          ElevatedButton.icon(
-            onPressed: onPlace,
-            icon: const Text('📦', style: TextStyle(fontSize: 16)),
-            label: Text(
-              hasItems
-                  ? canAfford
-                      ? 'Place Order'
-                      : 'Can\'t Afford'
-                  : 'Select Flowers',
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '$stock in shop now',
+                style: GoogleFonts.nunito(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.brownDark,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: packs > 0 ? onRemove : null,
+              tooltip: 'Remove ${flower.name} bundle',
+              icon: const Icon(Icons.remove_circle_rounded),
+              color: AppColors.gardenGreenDark,
+            ),
+            Text(
+              '$packs',
               style: GoogleFonts.nunito(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: AppColors.gardenGreenDark,
               ),
             ),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(0, 50),
-              backgroundColor: hasItems && canAfford
-                  ? AppColors.gardenGreenMid
-                  : Colors.white.withValues(alpha: 0.12),
-              foregroundColor:
-                  hasItems && canAfford ? Colors.white : Colors.white38,
-              elevation: hasItems && canAfford ? 4 : 0,
-              shadowColor: AppColors.gardenGreenDark.withValues(alpha: 0.4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+            IconButton(
+              onPressed: canAdd ? onAdd : null,
+              tooltip: 'Add ${flower.name} bundle',
+              icon: const Icon(Icons.add_circle_rounded),
+              color: AppColors.gardenGreenDark,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Push the wholesale screen from the market.
-Future<void> openWholesaleScreen(BuildContext context) {
-  if (!Features.wholesale) return Future<void>.value();
-  return Navigator.of(context).push(
-    PageRouteBuilder(
-      pageBuilder: (_, __, ___) => const WholesaleScreen(),
-      transitionsBuilder: (_, anim, __, child) => SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(1, 0),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
-        child: child,
-      ),
-      transitionDuration: const Duration(milliseconds: 380),
+          ],
+        ),
+      ],
     ),
   );
+}
+
+Future<void> openWholesaleScreen(BuildContext context) {
+  if (!Features.wholesale ||
+      ProviderScope.containerOf(context).read(gameProvider).day <
+          wholesaleUnlockDay) {
+    return Future<void>.value();
+  }
+  return Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const WholesaleScreen()));
 }

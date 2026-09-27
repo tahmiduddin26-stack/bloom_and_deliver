@@ -8,6 +8,7 @@ import '../models/shop_upgrades.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/shop_scene.dart';
 
 void openUpgradesScreen(BuildContext context) {
   if (!Features.upgrades) return;
@@ -29,11 +30,7 @@ class _UpgradesSheet extends ConsumerWidget {
 
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF2A3A2A), Color(0xFF1A2820)],
-        ),
+        color: Color(0xFFFFF2CF),
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: EdgeInsets.fromLTRB(
@@ -42,95 +39,115 @@ class _UpgradesSheet extends ConsumerWidget {
         20,
         16 + MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          // Header row
-          Row(
-            children: [
-              const Text('🔨', style: TextStyle(fontSize: 22)),
-              const SizedBox(width: 10),
-              Text(
-                'Shop Upgrades',
-                style: GoogleFonts.playfairDisplay(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.warmWhite,
-                ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(2),
               ),
-              const Spacer(),
-              // Wallet chip
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3A9068).withValues(alpha: 0.30),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFF5DBB8A).withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 18),
+
+            // Header row
+            Row(
+              children: [
+                const Icon(
+                  Icons.storefront_rounded,
+                  color: AppColors.gardenGreenDark,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Shop Upgrades',
+                  style: GoogleFonts.nunito(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.gardenGreenDark,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('🪙', style: TextStyle(fontSize: 13)),
-                    const SizedBox(width: 5),
-                    Text(
-                      '\$${state.money}',
-                      style: GoogleFonts.nunito(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
+                const Spacer(),
+                // Wallet chip
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3A9068).withValues(alpha: 0.30),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF5DBB8A).withValues(alpha: 0.5),
                     ),
-                  ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('🪙', style: TextStyle(fontSize: 13)),
+                      const SizedBox(width: 5),
+                      Text(
+                        '\$${state.money}',
+                        style: GoogleFonts.nunito(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-
-          // Upgrade cards
-          ...UpgradeId.values.map(
-            (id) => _UpgradeCard(
-              upgradeId: id,
-              owned: state.upgrades.has(id),
-              canAfford: state.money >= id.cost,
-              onBuy: () {
-                final bought = notifier.purchaseUpgrade(id);
-                if (bought) AudioService.instance.play(GameSound.coin);
-                if (bought && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${id.title} purchased! 🎉',
-                        style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
-                      ),
-                      duration: const Duration(seconds: 2),
-                      backgroundColor: const Color(0xFF3A9068),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  );
-                }
-              },
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-        ],
+            const SizedBox(height: 18),
+
+            SizedBox(
+              height: 110,
+              width: double.infinity,
+              child: ShopScene(
+                upgrades: state.upgrades,
+                activeDecor: state.activeDecor,
+              ),
+            ),
+            // Upgrade cards
+            ...UpgradeId.values.map(
+              (id) => _UpgradeCard(
+                upgradeId: id,
+                owned: state.upgrades.has(id),
+                canAfford: state.money >= id.cost,
+                onBuy: () {
+                  final bought = notifier.purchaseUpgrade(id);
+                  if (bought) AudioService.instance.play(GameSound.coin);
+                  if (bought && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '${id.title} purchased! 🎉',
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        duration: const Duration(seconds: 2),
+                        backgroundColor: const Color(0xFF3A9068),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -158,20 +175,26 @@ class _UpgradeCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: owned
-            ? const Color(0xFF3A9068).withValues(alpha: 0.20)
-            : Colors.white.withValues(alpha: 0.06),
+        color: owned ? const Color(0xFFD5EAB6) : const Color(0xFFFFFEF6),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: owned
-              ? const Color(0xFF5DBB8A).withValues(alpha: 0.5)
-              : Colors.white.withValues(alpha: 0.11),
-          width: 1.5,
-        ),
+        border: Border.all(color: AppColors.gardenGreenDark, width: 2),
       ),
       child: Row(
         children: [
-          Text(upgradeId.emoji, style: const TextStyle(fontSize: 28)),
+          Icon(
+            switch (upgradeId) {
+              UpgradeId.teaCart => Icons.emoji_food_beverage_rounded,
+              UpgradeId.ribbonRack => Icons.bookmark_rounded,
+              UpgradeId.tipJar => Icons.savings_rounded,
+              UpgradeId.workspaceXL => Icons.content_cut_rounded,
+              UpgradeId.extraShelf => Icons.shelves,
+              UpgradeId.flowerCooler => Icons.kitchen_rounded,
+              UpgradeId.wrappingStation => Icons.redeem_rounded,
+              UpgradeId.displayWindow => Icons.storefront_rounded,
+            },
+            size: 32,
+            color: AppColors.gardenGreen,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -182,7 +205,7 @@ class _UpgradeCard extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
-                    color: Colors.white,
+                    color: AppColors.gardenGreenDark,
                   ),
                 ),
                 Text(
@@ -190,7 +213,7 @@ class _UpgradeCard extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.60),
+                    color: AppColors.brownDark,
                   ),
                 ),
               ],
@@ -200,8 +223,7 @@ class _UpgradeCard extends StatelessWidget {
           // Owned badge / buy button
           if (owned)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: const Color(0xFF3A9068).withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(10),
@@ -220,24 +242,26 @@ class _UpgradeCard extends StatelessWidget {
               onTap: canAfford ? onBuy : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
                 decoration: BoxDecoration(
-                  gradient: canAfford
-                      ? const LinearGradient(
-                          colors: [Color(0xFFFFB830), Color(0xFFE8956A)],
-                        )
-                      : null,
                   color: canAfford
-                      ? null
-                      : Colors.white.withValues(alpha: 0.08),
+                      ? const Color(0xFFFFCE58)
+                      : const Color(0xFFE2DAC5),
+                  border: Border.all(
+                    color: AppColors.gardenGreenDark,
+                    width: 2,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: canAfford
                       ? [
                           BoxShadow(
-                            color: const Color(0xFFFFB830)
-                                .withValues(alpha: 0.40),
-                            blurRadius: 12,
+                            color: const Color(
+                              0xFFFFB830,
+                            ).withValues(alpha: 0.40),
+                            blurRadius: 0,
                             offset: const Offset(0, 4),
                           ),
                         ]
@@ -248,9 +272,7 @@ class _UpgradeCard extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
-                    color: canAfford
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.25),
+                    color: AppColors.gardenGreenDark,
                   ),
                 ),
               ),

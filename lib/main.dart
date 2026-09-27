@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'config/feature_flags.dart';
 import 'providers/saved_state_provider.dart';
@@ -15,6 +16,7 @@ import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  GoogleFonts.config.allowRuntimeFetching = false;
 
   // Gem purchases: debug builds get a local stub so the flows are testable.
   // Release builds keep the default UnavailableIap until a real billing plugin
@@ -25,6 +27,7 @@ void main() async {
 
   // Boot services (failures are silently swallowed inside each service).
   await NotificationService.instance.init();
+  await AudioService.instance.loadPreferences();
   await AudioService.instance.startAmbient();
   if (Features.ads) await AdService.instance.init();
 

@@ -110,10 +110,10 @@ class Flower {
   /// True for structural greens — same as [isFiller] but named for readability.
   bool get isGreens => isFiller;
 
-  /// Asset path for the 3D flower image.
+  /// Asset path for the botanical flower image.
   /// Drop a PNG named `{id}.png` into `assets/flowers/` and it will
   /// automatically replace the emoji placeholder everywhere in the app.
-  String get imagePath => 'assets/flowers/$id.png';
+  String get imagePath => 'assets/flowers/${id == 'rose' ? 'rose_red' : id}.png';
 
   /// True when this flower belongs to a seasonal event.
   bool get isEventExclusive => eventId != null;

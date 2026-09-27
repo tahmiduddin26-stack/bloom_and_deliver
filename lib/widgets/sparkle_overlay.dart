@@ -5,11 +5,7 @@ class SparkleOverlay extends StatefulWidget {
   final Widget child;
   final bool active;
 
-  const SparkleOverlay({
-    super.key,
-    required this.child,
-    required this.active,
-  });
+  const SparkleOverlay({super.key, required this.child, required this.active});
 
   @override
   State<SparkleOverlay> createState() => _SparkleOverlayState();
@@ -22,8 +18,20 @@ class _SparkleOverlayState extends State<SparkleOverlay>
   List<_Particle> _particles = [];
 
   static const _emojis = [
-    '✨', '🌸', '🌟', '💫', '🌺', '🌼', '🎊', '🌷',
-    '🪷', '🌻', '🎉', '💐', '🌈', '⭐',
+    '✨',
+    '🌸',
+    '🌟',
+    '💫',
+    '🌺',
+    '🌼',
+    '🎊',
+    '🌷',
+    '🪷',
+    '🌻',
+    '🎉',
+    '💐',
+    '🌈',
+    '⭐',
   ];
 
   @override
@@ -105,7 +113,11 @@ class _SparkleOverlayState extends State<SparkleOverlay>
     final x = (p.x + p.dx * curve) * w - p.size / 2;
     final y = (p.y + p.dy * curve) * h - p.size / 2;
     final opacity =
-        (t < 0.35 ? t / 0.35 : t < 0.65 ? 1.0 : (1.0 - t) / 0.35)
+        (t < 0.35
+                ? t / 0.35
+                : t < 0.65
+                ? 1.0
+                : (1.0 - t) / 0.35)
             .clamp(0.0, 1.0);
 
     return Positioned(
@@ -115,14 +127,54 @@ class _SparkleOverlayState extends State<SparkleOverlay>
         opacity: opacity,
         child: Transform.rotate(
           angle: curve * (p.x > 0.5 ? 1.2 : -1.2),
-          child: Text(
-            p.emoji,
-            style: TextStyle(fontSize: p.size),
+          child: CustomPaint(
+            size: Size.square(p.size),
+            painter: _PetalPainter(p.x),
           ),
         ),
       ),
     );
   }
+}
+
+class _PetalPainter extends CustomPainter {
+  final double seed;
+  _PetalPainter(this.seed);
+  @override
+  void paint(Canvas canvas, Size size) {
+    const colors = [
+      Color(0xFFFFCF4D),
+      Color(0xFFF3778C),
+      Color(0xFF81BC65),
+      Color(0xFF9B89CD),
+    ];
+    final paint = Paint()..color = colors[(seed * 100).floor() % colors.length];
+    final path = Path()
+      ..moveTo(size.width * .5, 0)
+      ..quadraticBezierTo(
+        size.width * 1.3,
+        size.height * .3,
+        size.width * .5,
+        size.height,
+      )
+      ..quadraticBezierTo(
+        -size.width * .3,
+        size.height * .7,
+        size.width * .5,
+        0,
+      );
+    canvas.drawPath(path, paint);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xFF354C3E)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PetalPainter oldDelegate) => oldDelegate.seed != seed;
 }
 
 class _Particle {

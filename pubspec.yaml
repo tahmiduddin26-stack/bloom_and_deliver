@@ -19,10 +19,6 @@ dependencies:
   flutter_local_notifications: ^17.2.4   # opt-in daily reminder
   audioplayers: ^6.1.0                   # ambient sounds, jingles
 
-  # Ads — currently disabled via Features.ads. The SDK still ships in the
-  # binary and can collect an advertising ID, so it must stay declared on the
-  # Data Safety form until this dependency is removed outright.
-  google_mobile_ads: ^5.1.0             # AdMob banner
 
 dev_dependencies:
   flutter_test:
@@ -35,6 +31,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/fonts/
     # Flower 3D renders — drop {flower_id}.png here to replace the emoji
     - assets/flowers/
 

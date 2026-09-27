@@ -32,6 +32,7 @@ class GemShopSheet extends ConsumerStatefulWidget {
 
 class _GemShopSheetState extends ConsumerState<GemShopSheet> {
   String? _pendingProductId;
+  late final Future<bool> _storeAvailable = IapService.instance.isAvailable();
 
   Future<void> _buy(GemPack pack) async {
     if (_pendingProductId != null) return;
@@ -58,14 +59,17 @@ class _GemShopSheetState extends ConsumerState<GemShopSheet> {
       AudioService.instance.play(GameSound.coin);
       _toast(okMessage);
     } else {
-      _toast('Not enough gems for that yet.');
+      _toast('Check your gems and whether this shortcut is needed.');
     }
   }
 
   void _toast(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+        content: Text(
+          msg,
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+        ),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
@@ -84,7 +88,7 @@ class _GemShopSheetState extends ConsumerState<GemShopSheet> {
       expand: false,
       builder: (context, scrollCtrl) => Container(
         decoration: const BoxDecoration(
-          color: Color(0xFFFFF8F0),
+          color: AppColors.cream,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
@@ -102,23 +106,33 @@ class _GemShopSheetState extends ConsumerState<GemShopSheet> {
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Row(
                 children: [
+                  const Icon(
+                    Icons.diamond_outlined,
+                    color: AppColors.gardenGreenDark,
+                    size: 27,
+                  ),
+                  const SizedBox(width: 8),
                   Text(
-                    '💎  Gems',
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.inkBrown,
+                    'Gem Garden',
+                    style: GoogleFonts.nunito(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.gardenGreenDark,
                     ),
                   ),
                   const Spacer(),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF7E57C2), Color(0xFF5E35B1)],
-                      ),
+                      color: const Color(0xFF7556AD),
                       borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.cartoonInk,
+                        width: 1.5,
+                      ),
                     ),
                     child: Text(
                       '💎 $gems',
@@ -166,7 +180,8 @@ class _GemShopSheetState extends ConsumerState<GemShopSheet> {
                   _SinkTile(
                     emoji: '🎲',
                     name: 'New Challenges',
-                    detail: 'Swap today\'s three challenges.',
+                    detail:
+                        'Swap challenges before serving the first customer.',
                     cost: kGemCostRerollChallenges,
                     affordable: gems >= kGemCostRerollChallenges,
                     onTap: () => _spend(
@@ -175,27 +190,40 @@ class _GemShopSheetState extends ConsumerState<GemShopSheet> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _SectionLabel(
-                    title: 'Get more gems',
-                    subtitle: 'Entirely optional — the whole game is playable '
-                        'without spending.',
-                  ),
-                  for (final pack in gemPacks)
-                    _PackTile(
-                      pack: pack,
-                      pending: _pendingProductId == pack.productId,
-                      onTap: () => _buy(pack),
-                    ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Prices shown are indicative; your store shows the final '
-                    'price in your local currency before you confirm.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.nunito(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.brownLight,
-                    ),
+                  FutureBuilder<bool>(
+                    future: _storeAvailable,
+                    builder: (context, snapshot) {
+                      final available = snapshot.data == true;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _SectionLabel(
+                            title: 'Grow your gems',
+                            subtitle: available
+                                ? 'Earn 5 gems for each new journey star, or choose an optional pack.'
+                                : 'Earn 5 gems for each new journey star. Replay a level to collect its missing stars.',
+                          ),
+                          if (available) ...[
+                            for (final pack in gemPacks)
+                              _PackTile(
+                                pack: pack,
+                                pending: _pendingProductId == pack.productId,
+                                onTap: () => _buy(pack),
+                              ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Your store confirms the final price before purchase.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.brownLight,
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -215,29 +243,29 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: GoogleFonts.nunito(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                color: AppColors.inkBrown,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: GoogleFonts.nunito(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: AppColors.brownLight,
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.nunito(
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+            color: AppColors.inkBrown,
+          ),
         ),
-      );
+        Text(
+          subtitle,
+          style: GoogleFonts.nunito(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.brownLight,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _SinkTile extends StatelessWidget {
@@ -269,9 +297,7 @@ class _SinkTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.gardenGreenMid.withValues(alpha: 0.3),
-            ),
+            border: Border.all(color: AppColors.cartoonInk, width: 1.5),
           ),
           child: Row(
             children: [
@@ -301,8 +327,10 @@ class _SinkTile extends StatelessWidget {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF7E57C2).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
@@ -386,10 +414,9 @@ class _PackTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF7E57C2), Color(0xFF5E35B1)],
-                ),
+                color: const Color(0xFF7556AD),
                 borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.cartoonInk, width: 1.5),
               ),
               child: pending
                   ? const SizedBox(
@@ -397,8 +424,7 @@ class _PackTile extends StatelessWidget {
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                   : Text(

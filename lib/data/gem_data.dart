@@ -1,9 +1,7 @@
 /// Gem packs — the premium currency catalogue.
 ///
 /// Gems are bought with real money and spent only on optional time-savers.
-/// They are deliberately **never earned from play**, so the coin economy (order
-/// payments, flower costs, star goals) stays exactly as balanced for a player
-/// who never spends a penny.
+/// Journey stars also award gems, making every shortcut earnable through play.
 class GemPack {
   /// Store product identifier. Must match the SKU configured in Google Play
   /// Console / App Store Connect before purchases can work.
@@ -84,3 +82,6 @@ const int kGemCostRerollChallenges = 10;
 /// One-off gems handed out when the tutorial completes, so the player learns
 /// what gems do by spending real ones before ever seeing a price tag.
 const int kTutorialGemGift = 25;
+
+/// Awarded only for stars beyond a level's previous best, including replays.
+const int kGemsPerJourneyStar = 5;

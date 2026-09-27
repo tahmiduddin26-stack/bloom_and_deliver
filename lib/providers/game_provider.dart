@@ -10,6 +10,7 @@ import '../data/order_data.dart';
 import '../data/seasonal_events_data.dart';
 import '../data/shop_decor_data.dart';
 import '../data/story_arc_data.dart';
+import '../data/wholesale_data.dart';
 import '../models/achievement.dart';
 import '../models/big_order.dart';
 import '../models/bouquet_order.dart';
@@ -29,6 +30,7 @@ import 'saved_state_provider.dart';
 class GameNotifier extends Notifier<GameState> {
   @override
   GameState build() {
+    listenSelf((previous, next) => PersistenceService.saveState(next));
     final saved = ref.read(savedGameStateProvider);
     return saved ?? _freshState(day: 1, money: 120);
   }
@@ -56,7 +58,8 @@ class GameNotifier extends Notifier<GameState> {
     final order = state.currentOrder;
     final effectiveMax =
         (order?.maxFlowers ?? 8) + state.upgrades.workspaceBonusSlots;
-    if (order != null && state.bouquetWorkspace.length >= effectiveMax) return;
+    if (state.bouquetWorkspace.length >= effectiveMax) return;
+    if (!flowerById.containsKey(flowerId)) return;
 
     final inventory = Map<String, int>.from(state.inventory);
     if ((inventory[flowerId] ?? 0) <= 0) return;
@@ -71,16 +74,13 @@ class GameNotifier extends Notifier<GameState> {
 
   void removeFlowerFromWorkspace(int index) {
     final workspace = List<Flower>.from(state.bouquetWorkspace);
-    if (index >= workspace.length) return;
+    if (index < 0 || index >= workspace.length) return;
     final flower = workspace.removeAt(index);
 
     final inventory = Map<String, int>.from(state.inventory);
     inventory[flower.id] = (inventory[flower.id] ?? 0) + 1;
 
-    state = state.copyWith(
-      bouquetWorkspace: workspace,
-      inventory: inventory,
-    );
+    state = state.copyWith(bouquetWorkspace: workspace, inventory: inventory);
   }
 
   /// Undo the last flower added to the workspace (returns it to inventory).
@@ -92,10 +92,7 @@ class GameNotifier extends Notifier<GameState> {
     final inventory = Map<String, int>.from(state.inventory);
     inventory[flower.id] = (inventory[flower.id] ?? 0) + 1;
 
-    state = state.copyWith(
-      bouquetWorkspace: workspace,
-      inventory: inventory,
-    );
+    state = state.copyWith(bouquetWorkspace: workspace, inventory: inventory);
   }
 
   void clearWorkspace() {
@@ -108,9 +105,17 @@ class GameNotifier extends Notifier<GameState> {
 
   // ── Scoring ───────────────────────────────────────────────────────────────────
 
-  OrderResult submitBouquet() {
+  int get greatStreak => state.completedToday.reversed
+      .takeWhile((entry) => entry.$1.result == OrderResult.great)
+      .length;
+
+  int get serviceSeconds =>
+      levelForDay(state.day).serviceSeconds +
+      (state.upgrades.has(UpgradeId.teaCart) ? 8 : 0);
+
+  OrderResult submitBouquet({Duration? serviceTime}) {
     final order = state.currentOrder;
-    if (order == null) return OrderResult.poor;
+    if (order == null || state.dayEnded || !canSubmit) return OrderResult.poor;
 
     final (result, baseEarned) = order.score(state.bouquetWorkspace);
 
@@ -127,28 +132,49 @@ class GameNotifier extends Notifier<GameState> {
       ['cheerful', 'vibrant', 'bold', 'wild', 'fresh', 'natural'],
       ['mystical', 'luxurious', 'exotic', 'festive', 'rustic', 'traditional'],
     ];
-    final requiredVibeNames =
-        order.requiredVibes.map((v) => v.name).toSet();
-    final discoveredChapterBonus = !order.isMystery && requiredVibeNames.isNotEmpty
-        ? chapterVibes.any((chapter) =>
-            state.vibeDiscoveries.containsAll(chapter) &&
-            requiredVibeNames.any((v) => chapter.contains(v)))
+    final requiredVibeNames = order.requiredVibes.map((v) => v.name).toSet();
+    final discoveredChapterBonus =
+        !order.isMystery && requiredVibeNames.isNotEmpty
+        ? chapterVibes.any(
+            (chapter) =>
+                state.vibeDiscoveries.containsAll(chapter) &&
+                requiredVibeNames.any((v) => chapter.contains(v)),
+          )
         : false;
-    final vibeBonus = discoveredChapterBonus ? (upgradedEarned * 0.10).round() : 0;
+    final vibeBonus = discoveredChapterBonus
+        ? (upgradedEarned * 0.10).round()
+        : 0;
 
     // ── Greens / filler bonus ─────────────────────────────────────────────────────
     // Including at least one filler (eucalyptus, fern, baby's breath, statice)
     // alongside at least 3 non-filler flowers earns a 5% bonus.
     // Orders that explicitly prefersGreens get a 10% bonus instead.
     final hasGreens = state.bouquetWorkspace.any((f) => f.isFiller);
-    final nonFillerCount = state.bouquetWorkspace.where((f) => !f.isFiller).length;
-    final greensBonus = (hasGreens && nonFillerCount >= 3 && result != OrderResult.poor)
+    final nonFillerCount = state.bouquetWorkspace
+        .where((f) => !f.isFiller)
+        .length;
+    final greensBonus =
+        (hasGreens && nonFillerCount >= 3 && result != OrderResult.poor)
         ? (upgradedEarned * (order.prefersGreens ? 0.10 : 0.05)).round()
         : 0;
 
     // Total earned for this order — bonuses included so day earnings,
     // stats, and the money balance all agree.
-    final earned = upgradedEarned + vibeBonus + greensBonus;
+    final quick =
+        serviceTime != null &&
+        !serviceTime.isNegative &&
+        serviceTime <= Duration(seconds: serviceSeconds);
+    final streakStep = state.upgrades.has(UpgradeId.tipJar) ? 0.08 : 0.05;
+    final streakBonus = result == OrderResult.great
+        ? (baseEarned * greatStreak.clamp(0, 4) * streakStep).round()
+        : 0;
+    final speedBonus = quick && result == OrderResult.great
+        ? (baseEarned *
+                  (state.upgrades.has(UpgradeId.ribbonRack) ? 0.30 : 0.20))
+              .round()
+        : 0;
+    final earned =
+        upgradedEarned + vibeBonus + greensBonus + streakBonus + speedBonus;
 
     final updatedOrder = order.copyWith(result: result);
     final updatedOrders = List<BouquetOrder>.from(state.dayOrders);
@@ -173,8 +199,7 @@ class GameNotifier extends Notifier<GameState> {
     final rankedUp = newRank != oldRank;
 
     // ── Great streak ─────────────────────────────────────────────────────────────
-    final newStreak =
-        result == OrderResult.great ? state.greatStreak + 1 : 0;
+    final newStreak = result == OrderResult.great ? state.greatStreak + 1 : 0;
 
     // ── Stats ────────────────────────────────────────────────────────────────────
     final newTotalServed = state.totalOrdersServed + 1;
@@ -219,10 +244,14 @@ class GameNotifier extends Notifier<GameState> {
     );
 
     // Pay out rewards for any challenges newly completed this submit
-    final prevCompletedIds =
-        state.dailyChallenges.where((c) => c.completed).map((c) => c.id).toSet();
-    final nowCompletedIds =
-        updatedChallenges.where((c) => c.completed).map((c) => c.id).toSet();
+    final prevCompletedIds = state.dailyChallenges
+        .where((c) => c.completed)
+        .map((c) => c.id)
+        .toSet();
+    final nowCompletedIds = updatedChallenges
+        .where((c) => c.completed)
+        .map((c) => c.id)
+        .toSet();
     final newlyCompletedIds = nowCompletedIds.difference(prevCompletedIds);
     final challengeBonus = updatedChallenges
         .where((c) => newlyCompletedIds.contains(c.id))
@@ -239,8 +268,9 @@ class GameNotifier extends Notifier<GameState> {
       newVibes: newVibes,
       newRank: newRank,
       challengesCompleted: updatedChallenges.where((c) => c.completed).length,
-      prevChallengesCompleted:
-          state.dailyChallenges.where((c) => c.completed).length,
+      prevChallengesCompleted: state.dailyChallenges
+          .where((c) => c.completed)
+          .length,
     );
 
     // ── Friendship & memory snippets ─────────────────────────────────────────────
@@ -263,7 +293,11 @@ class GameNotifier extends Notifier<GameState> {
       if (currentFriendship < level && newFriendship >= level) {
         final snippet = customer.snippetForLevel(level);
         if (snippet != null) {
-          final snippetIdx = level == 1 ? 0 : level == 3 ? 1 : 2;
+          final snippetIdx = level == 1
+              ? 0
+              : level == 3
+              ? 1
+              : 2;
           newPendingMemories.add('${customer.id}:$snippetIdx');
         }
       }
@@ -280,11 +314,13 @@ class GameNotifier extends Notifier<GameState> {
 
     // ── Level stars (awarded when the day's last order is served) ────────────────
     Map<int, int>? newLevelStars;
+    var journeyGems = 0;
     if (dayEnded) {
       final dayTotal = completed.fold(0, (s, e) => s + e.$2);
       final stars = levelForDay(state.day).starsFor(dayTotal);
       final best = state.levelStars[state.day] ?? 0;
       if (stars > best) {
+        journeyGems = (stars - best) * kGemsPerJourneyStar;
         newLevelStars = Map<int, int>.from(state.levelStars);
         newLevelStars[state.day] = stars;
       }
@@ -292,6 +328,11 @@ class GameNotifier extends Notifier<GameState> {
 
     state = state.copyWith(
       money: newMoney + challengeBonus,
+      gems: state.gems + journeyGems,
+      bestDayEarnings:
+          dayEnded && state.dayEarnings + earned > state.bestDayEarnings
+          ? state.dayEarnings + earned
+          : state.bestDayEarnings,
       dayOrders: updatedOrders,
       currentOrderIndex: nextIndex,
       bouquetWorkspace: [],
@@ -316,8 +357,6 @@ class GameNotifier extends Notifier<GameState> {
       allTimeFlowerUse: newFlowerUse,
       levelStars: newLevelStars,
     );
-
-    if (dayEnded) PersistenceService.saveState(state);
 
     return result;
   }
@@ -426,9 +465,7 @@ class GameNotifier extends Notifier<GameState> {
   /// Pop the first pending memory snippet from the queue.
   void popPendingMemory() {
     if (state.pendingMemories.isEmpty) return;
-    state = state.copyWith(
-      pendingMemories: state.pendingMemories.sublist(1),
-    );
+    state = state.copyWith(pendingMemories: state.pendingMemories.sublist(1));
   }
 
   void clearPendingStoryChapter() {
@@ -444,6 +481,7 @@ class GameNotifier extends Notifier<GameState> {
   /// Buy a seed packet and plant it in [slot] (0–2).
   /// Returns false if can't afford or slot is occupied.
   bool plantSeed(String flowerId, int slot) {
+    if (slot < 0 || slot >= 3) return false;
     final flower = flowerById[flowerId];
     if (flower == null || !flower.isGrowable) return false;
     final seedCost = flower.seedPrice!;
@@ -460,7 +498,7 @@ class GameNotifier extends Notifier<GameState> {
       money: state.money - seedCost,
       windowsillPlots: [...state.windowsillPlots, newPlot],
     );
-    PersistenceService.saveState(state);
+
     return true;
   }
 
@@ -476,43 +514,58 @@ class GameNotifier extends Notifier<GameState> {
     inventory[plot.flowerId] = (inventory[plot.flowerId] ?? 0) + 1;
     dayAdded[plot.flowerId] = state.day;
 
-    final remaining = state.windowsillPlots.where((p) => p.slot != slot).toList();
+    final remaining = state.windowsillPlots
+        .where((p) => p.slot != slot)
+        .toList();
     state = state.copyWith(
       inventory: inventory,
       inventoryDayAdded: dayAdded,
       windowsillPlots: remaining,
     );
-    PersistenceService.saveState(state);
+
     return true;
   }
 
   // ── Tier 3 — Delivery missions ────────────────────────────────────────────────
 
-  /// Submit a bouquet for a delivery mission. Returns the result.
-  DeliveryResult submitDelivery(String missionId, List<Flower> bouquet) {
+  /// Submit a bouquet for a delivery mission. Invalid attempts change nothing.
+  DeliveryResult? submitDelivery(String missionId, List<Flower> bouquet) {
     final idx = state.pendingDeliveries.indexWhere((m) => m.id == missionId);
-    if (idx < 0) return DeliveryResult.poor;
+    if (idx < 0) return null;
     final mission = state.pendingDeliveries[idx];
+    if (mission.isCompleted ||
+        bouquet.length < mission.minFlowers ||
+        bouquet.length > mission.maxFlowers) {
+      return null;
+    }
+    final inventory = Map<String, int>.from(state.inventory);
+    for (final flower in bouquet) {
+      if (flowerById[flower.id] != flower || (inventory[flower.id] ?? 0) <= 0) {
+        return null;
+      }
+      inventory[flower.id] = inventory[flower.id]! - 1;
+    }
 
     // Score: count how many required vibes are represented in the bouquet
     final bouquetVibes = bouquet.expand((f) => f.vibes).toSet();
-    final matched =
-        mission.requiredVibes.where((v) => bouquetVibes.contains(v)).length;
+    final matched = mission.requiredVibes
+        .where((v) => bouquetVibes.contains(v))
+        .length;
     final total = mission.requiredVibes.length;
     final ratio = total > 0 ? matched / total : 0.0;
 
     final result = ratio >= 0.8
         ? DeliveryResult.great
         : ratio >= 0.5
-            ? DeliveryResult.good
-            : DeliveryResult.poor;
+        ? DeliveryResult.good
+        : DeliveryResult.poor;
 
     final baseReward = mission.reward;
     final earned = result == DeliveryResult.great
         ? (baseReward * 1.25).round()
         : result == DeliveryResult.good
-            ? baseReward
-            : (baseReward * 0.5).round();
+        ? baseReward
+        : (baseReward * 0.5).round();
 
     final updated = List<DeliveryMission>.from(state.pendingDeliveries);
     updated[idx] = mission.copyWith(result: result, earned: earned);
@@ -521,8 +574,9 @@ class GameNotifier extends Notifier<GameState> {
       money: state.money + earned,
       totalEarnings: state.totalEarnings + earned,
       pendingDeliveries: updated,
+      inventory: inventory,
     );
-    PersistenceService.saveState(state);
+
     return result;
   }
 
@@ -533,6 +587,8 @@ class GameNotifier extends Notifier<GameState> {
   /// gems so the player owns the premium currency before ever being asked to
   /// buy it.
   void claimTutorialReward() {
+    const rewardId = 'tutorial_reward_claimed';
+    if (state.unlockedAchievements.contains(rewardId)) return;
     final inv = Map<String, int>.from(state.inventory);
     final dayAdded = Map<String, int>.from(state.inventoryDayAdded);
     for (final entry in {'peony': 2, 'orchid': 2, 'ranunculus': 1}.entries) {
@@ -542,24 +598,21 @@ class GameNotifier extends Notifier<GameState> {
     state = state.copyWith(
       money: state.money + 50,
       gems: state.gems + kTutorialGemGift,
+      unlockedAchievements: {...state.unlockedAchievements, rewardId},
       inventory: inv,
       inventoryDayAdded: dayAdded,
     );
-    PersistenceService.saveState(state);
   }
 
   // ── Gems (premium currency) ─────────────────────────────────────────────────
   //
-  // Gems only ever enter the wallet from a confirmed store purchase or the
-  // one-off tutorial gift — never from play — so the coin economy stays exactly
-  // as balanced for a player who never spends.
+  // Gems come from journey stars, the starter gift, or confirmed purchases.
 
   /// Credit [amount] gems. Call only after the store confirms payment (or for
   /// the tutorial gift).
   void grantGems(int amount) {
     if (amount <= 0) return;
     state = state.copyWith(gems: state.gems + amount);
-    PersistenceService.saveState(state);
   }
 
   /// Deduct [cost] gems. Returns false (and changes nothing) if too poor.
@@ -572,6 +625,11 @@ class GameNotifier extends Notifier<GameState> {
   /// Instantly top every unlocked flower up to a full shelf. Saves the player a
   /// market run; grants no coins.
   bool gemInstantRestock() {
+    if (!unlockedFlowers(
+      state.day,
+    ).any((f) => (state.inventory[f.id] ?? 0) < 5)) {
+      return false;
+    }
     if (!_spendGems(kGemCostInstantRestock)) return false;
     const shelfTarget = 5;
     final inv = Map<String, int>.from(state.inventory);
@@ -583,20 +641,30 @@ class GameNotifier extends Notifier<GameState> {
       }
     }
     state = state.copyWith(inventory: inv, inventoryDayAdded: dayAdded);
-    PersistenceService.saveState(state);
-    AnalyticsService.instance.gemsSpent('instant_restock', kGemCostInstantRestock);
+
+    AnalyticsService.instance.gemsSpent(
+      'instant_restock',
+      kGemCostInstantRestock,
+    );
     return true;
   }
 
   /// Reset the freshness clock on everything in stock — nothing wilts tonight.
   bool gemFreshWater() {
+    if (!state.inventory.entries.any(
+      (e) =>
+          e.value > 0 &&
+          (state.inventoryDayAdded[e.key] ?? state.day) < state.day,
+    )) {
+      return false;
+    }
     if (!_spendGems(kGemCostFreshWater)) return false;
     final dayAdded = Map<String, int>.from(state.inventoryDayAdded);
     state.inventory.forEach((id, qty) {
       if (qty > 0) dayAdded[id] = state.day;
     });
     state = state.copyWith(inventoryDayAdded: dayAdded);
-    PersistenceService.saveState(state);
+
     AnalyticsService.instance.gemsSpent('fresh_water', kGemCostFreshWater);
     return true;
   }
@@ -604,8 +672,10 @@ class GameNotifier extends Notifier<GameState> {
   /// Swap today's three challenges for a different set. Progress on the old set
   /// is discarded; rewards themselves are unchanged.
   bool gemRerollChallenges() {
+    if (state.dayEnded || state.currentOrderIndex > 0) return false;
     if (!_spendGems(kGemCostRerollChallenges)) return false;
-    final salt = state.dailyChallenges.fold<int>(
+    final salt =
+        state.dailyChallenges.fold<int>(
           1,
           (acc, c) => acc + c.id.hashCode.abs() % 97,
         ) +
@@ -613,9 +683,11 @@ class GameNotifier extends Notifier<GameState> {
     state = state.copyWith(
       dailyChallenges: generateDailyChallenges(state.day, salt: salt),
     );
-    PersistenceService.saveState(state);
-    AnalyticsService.instance
-        .gemsSpent('reroll_challenges', kGemCostRerollChallenges);
+
+    AnalyticsService.instance.gemsSpent(
+      'reroll_challenges',
+      kGemCostRerollChallenges,
+    );
     return true;
   }
 
@@ -632,14 +704,17 @@ class GameNotifier extends Notifier<GameState> {
 
     final lastDate = DateTime.fromMillisecondsSinceEpoch(last);
     final yesterday = DateTime(now.year, now.month, now.day - 1);
-    final isConsecutive = DateTime(lastDate.year, lastDate.month, lastDate.day)
-        .isAtSameMomentAs(yesterday);
+    final isConsecutive = DateTime(
+      lastDate.year,
+      lastDate.month,
+      lastDate.day,
+    ).isAtSameMomentAs(yesterday);
 
     final newStreak = last == 0
         ? 1
         : isConsecutive
-            ? state.loginStreak + 1
-            : 1;
+        ? state.loginStreak + 1
+        : 1;
 
     // Every 7-day streak milestone: grant a free peony (rare flower)
     Map<String, int>? bonusInventory;
@@ -658,7 +733,6 @@ class GameNotifier extends Notifier<GameState> {
       inventoryDayAdded: bonusDayAdded,
     );
     AnalyticsService.instance.loginStreak(newStreak);
-    PersistenceService.saveState(state);
   }
 
   // ── Restock / market ──────────────────────────────────────────────────────────
@@ -667,7 +741,11 @@ class GameNotifier extends Notifier<GameState> {
   /// normal flower cost (optional; defaults to [Flower.cost]).
   bool restockFlower(String flowerId, int qty, {int? costPerUnit}) {
     final flower = flowerById[flowerId];
-    if (flower == null) return false;
+    if (flower == null ||
+        qty <= 0 ||
+        (costPerUnit != null && costPerUnit <= 0)) {
+      return false;
+    }
 
     // Extra Shelf upgrade: 10% off all market restocks.
     final basePrice = costPerUnit ?? flower.cost;
@@ -690,7 +768,6 @@ class GameNotifier extends Notifier<GameState> {
       restockSpentToday: state.restockSpentToday + totalCost,
     );
 
-    PersistenceService.saveState(state);
     return true;
   }
 
@@ -717,20 +794,21 @@ class GameNotifier extends Notifier<GameState> {
       pendingAchievements: newQueue,
     );
 
-    PersistenceService.saveState(state);
     return true;
   }
 
   // ── Day progression ───────────────────────────────────────────────────────────
 
   void startNextDay() {
+    if (!state.dayEnded) return;
     // Next level up — after replaying an old level this still jumps to the
     // frontier of the campaign rather than re-walking already-beaten days.
-    final nextDay = state.nextLevel > state.day ? state.nextLevel : state.day + 1;
+    final nextDay = state.nextLevel;
 
     // Check perfectDay achievement before resetting completedToday
-    final hadPoorToday =
-        state.completedToday.any((e) => e.$1.result == OrderResult.poor);
+    final hadPoorToday = state.completedToday.any(
+      (e) => e.$1.result == OrderResult.poor,
+    );
     final unlockedAchs = Set<String>.from(state.unlockedAchievements);
     final newQueue = List<String>.from(state.pendingAchievements);
 
@@ -756,6 +834,9 @@ class GameNotifier extends Notifier<GameState> {
     final inventory = Map<String, int>.from(state.inventory);
     final dayAdded = Map<String, int>.from(state.inventoryDayAdded);
     final bonusDays = state.upgrades.freshnessBonusDays;
+    // A replay-to-frontier jump ages stock by one day, not by skipped levels.
+    final skippedDays = nextDay - state.day - 1;
+    dayAdded.updateAll((id, added) => added + skippedDays);
 
     for (final id in inventory.keys.toList()) {
       final flower = flowerById[id];
@@ -763,7 +844,7 @@ class GameNotifier extends Notifier<GameState> {
       // Flowers without a recorded add-day are treated as added today
       // (never wilt them by accident).
       final addedDay = dayAdded[id] ?? state.day;
-      final daysInStock = state.day - addedDay;
+      final daysInStock = nextDay - addedDay;
       if (daysInStock >= flower.wiltsAfterDays + bonusDays) {
         inventory.remove(id);
         dayAdded.remove(id);
@@ -793,11 +874,14 @@ class GameNotifier extends Notifier<GameState> {
 
     // ── Tier 4: Big order commission ──────────────────────────────────────────
     // Offer a new big order when one becomes available AND none is active yet.
-    BigOrder? nextBigOrder = state.activeBigOrder;
-    if (nextBigOrder == null || nextBigOrder.isComplete) {
-      final offered = bigOrderForDay(nextDay);
-      nextBigOrder = offered; // may be null (non-window days)
-    }
+    final activeCommission = state.activeBigOrder;
+    final BigOrder? nextBigOrder =
+        activeCommission != null &&
+            !activeCommission.isComplete &&
+            nextDay >= activeCommission.commissionDay &&
+            nextDay <= activeCommission.deadlineDay
+        ? activeCommission
+        : bigOrderForDay(nextDay);
 
     // ── Tier 4: Wholesale delivery ────────────────────────────────────────────
     // Flowers ordered wholesale yesterday arrive this morning.
@@ -852,8 +936,6 @@ class GameNotifier extends Notifier<GameState> {
       allTimeFlowerUse: state.allTimeFlowerUse,
       levelStars: state.levelStars,
     );
-
-    PersistenceService.saveState(state);
   }
 
   // ── Level campaign ────────────────────────────────────────────────────────────
@@ -870,17 +952,22 @@ class GameNotifier extends Notifier<GameState> {
     // Advancing to the next day from a just-finished one must run the full
     // day-advance pipeline (wilting, wholesale arrivals, deliveries, events)
     // — otherwise skipping the market would skip all of that too.
-    if (state.dayEnded && level == state.day + 1 && level == state.nextLevel) {
+    if (state.dayEnded && level == state.nextLevel) {
       startNextDay();
       return true;
     }
 
+    clearWorkspace();
+    // Replays move the campaign marker, not the age of the flowers.
+    final replayDayAdded = state.inventoryDayAdded.map(
+      (id, added) => MapEntry(id, level - (state.day - added).clamp(0, 999999)),
+    );
     state = GameState(
       day: level,
       money: state.money,
       gems: state.gems, // purchased currency must survive replaying a level
       inventory: state.inventory,
-      inventoryDayAdded: state.inventoryDayAdded,
+      inventoryDayAdded: replayDayAdded,
       restockSpentToday: 0,
       dayOrders: generateDayOrders(
         level,
@@ -915,7 +1002,7 @@ class GameNotifier extends Notifier<GameState> {
       allTimeFlowerUse: state.allTimeFlowerUse,
       levelStars: state.levelStars,
     );
-    PersistenceService.saveState(state);
+
     return true;
   }
 
@@ -925,36 +1012,59 @@ class GameNotifier extends Notifier<GameState> {
   /// Returns the contribution result, or null if no active order / already submitted.
   ContributionResult? contributeBigOrder(List<Flower> bouquet) {
     final order = state.activeBigOrder;
-    if (order == null || order.isComplete) return null;
+    if (order == null ||
+        !state.dayEnded ||
+        !order.canContributeOn(state.day) ||
+        state.day < state.highestCompletedLevel) {
+      return null;
+    }
+    if (bouquet.length < order.minFlowers ||
+        bouquet.length > order.maxFlowers ||
+        bouquet.any((flower) => !unlockedFlowers(state.day).contains(flower))) {
+      return null;
+    }
+
+    final used = <String, int>{};
+    for (final flower in bouquet) {
+      used.update(flower.id, (count) => count + 1, ifAbsent: () => 1);
+    }
+    if (used.entries.any(
+      (entry) => entry.value > (state.inventory[entry.key] ?? 0),
+    )) {
+      return null;
+    }
 
     final dayIdx = order.nextDayIndex;
     if (dayIdx == null) return null;
 
     // Score: vibe-match ratio, same logic as deliveries
     final bouquetVibes = bouquet.expand((f) => f.vibes).toSet();
-    final matched =
-        order.requiredVibes.where((v) => bouquetVibes.contains(v)).length;
+    final matched = order.requiredVibes
+        .where((v) => bouquetVibes.contains(v))
+        .length;
     final total = order.requiredVibes.length;
     final ratio = total > 0 ? matched / total : 0.0;
 
     final result = ratio >= 0.8
         ? ContributionResult.great
         : ratio >= 0.5
-            ? ContributionResult.good
-            : ContributionResult.poor;
+        ? ContributionResult.good
+        : ContributionResult.poor;
 
     final earned = result == ContributionResult.poor
         ? 0
         : result == ContributionResult.great
-            ? (order.dailyReward * 1.25).round()
-            : order.dailyReward;
+        ? (order.dailyReward * 1.25).round()
+        : order.dailyReward;
 
-    final updatedContributions =
-        List<DayContribution>.from(order.contributions);
+    final updatedContributions = List<DayContribution>.from(
+      order.contributions,
+    );
     updatedContributions[dayIdx] = DayContribution(
       flowerIds: bouquet.map((f) => f.id).toList(),
       result: result,
       earned: earned,
+      gameDay: state.day,
     );
 
     final updatedOrder = order.copyWith(contributions: updatedContributions);
@@ -963,15 +1073,19 @@ class GameNotifier extends Notifier<GameState> {
     // Pay out: daily reward + completion bonus if all 3 days done
     final totalPayout = earned + (isNowComplete ? order.completionBonus : 0);
 
-    // Flowers in the workspace were already deducted from inventory when added.
-    // Clear the workspace without returning them (they're now part of the delivery).
+    final inventory = Map<String, int>.from(state.inventory);
+    for (final entry in used.entries) {
+      inventory[entry.key] = inventory[entry.key]! - entry.value;
+      if (inventory[entry.key] == 0) inventory.remove(entry.key);
+    }
+
     state = state.copyWith(
       activeBigOrder: updatedOrder,
       money: state.money + totalPayout,
       totalEarnings: state.totalEarnings + totalPayout,
-      bouquetWorkspace: [],
+      inventory: inventory,
     );
-    PersistenceService.saveState(state);
+
     return result;
   }
 
@@ -990,30 +1104,58 @@ class GameNotifier extends Notifier<GameState> {
     inventory[flowerId] = inStock - qty;
     if (inventory[flowerId] == 0) inventory.remove(flowerId);
 
-    state = state.copyWith(
-      money: state.money + earned,
-      inventory: inventory,
-    );
-    PersistenceService.saveState(state);
+    state = state.copyWith(money: state.money + earned, inventory: inventory);
+
     return true;
   }
 
   // ── Tier 4 — Wholesale ordering ───────────────────────────────────────────────
 
-  /// Queue a wholesale order for [qty] of [flowerId]; flowers arrive tomorrow.
-  /// Deducts [totalCost] immediately. Returns false if can't afford.
-  bool placeWholesaleOrder(String flowerId, int qty, int totalCost) {
-    if (state.money < totalCost) return false;
-    final pending = Map<String, int>.from(state.wholesalePending);
-    pending[flowerId] = (pending[flowerId] ?? 0) + qty;
+  /// Queue bundles as a single purchase, so a mixed cart is never half-paid.
+  /// The stock is delivered fresh when the next level begins.
+  bool placeWholesaleCart(Map<String, int> quantities) {
+    if (state.day < wholesaleUnlockDay || quantities.isEmpty) return false;
 
+    final stems = quantities.values.fold(0, (total, qty) => total + qty);
+    if (stems <= 0 ||
+        stems + wholesalePendingStems(state.wholesalePending) >
+            wholesalePackSize * wholesaleMaxPacksPerDay) {
+      return false;
+    }
+
+    var totalCost = 0;
+    for (final entry in quantities.entries) {
+      final flower = flowerById[entry.key];
+      if (flower == null ||
+          flower.isEventExclusive ||
+          flower.unlockDay > state.day ||
+          entry.value <= 0 ||
+          entry.value % wholesalePackSize != 0) {
+        return false;
+      }
+      totalCost += wholesaleUnitPrice(flower) * entry.value;
+    }
+    if (totalCost > state.money) return false;
+
+    final pending = Map<String, int>.from(state.wholesalePending);
+    for (final entry in quantities.entries) {
+      pending[entry.key] = (pending[entry.key] ?? 0) + entry.value;
+    }
     state = state.copyWith(
       money: state.money - totalCost,
       wholesalePending: pending,
       restockSpentToday: state.restockSpentToday + totalCost,
     );
-    PersistenceService.saveState(state);
     return true;
+  }
+
+  /// Single-flower compatibility API, with a verified price.
+  bool placeWholesaleOrder(String flowerId, int qty, int totalCost) {
+    final flower = flowerById[flowerId];
+    if (flower == null || totalCost != wholesaleUnitPrice(flower) * qty) {
+      return false;
+    }
+    return placeWholesaleCart({flowerId: qty});
   }
 
   // ── Tier 4 — UI acknowledgements ─────────────────────────────────────────────
@@ -1037,21 +1179,21 @@ class GameNotifier extends Notifier<GameState> {
       money: state.money - decor.cost,
       purchasedDecor: owned,
     );
-    PersistenceService.saveState(state);
+
     return true;
   }
 
   /// Equip an owned decoration. Returns false if not owned.
   bool equipDecor(ShopDecorCategory category, String decorId) {
     final decor = decorById[decorId];
-    if (decor == null) return false;
+    if (decor == null || decor.category != category) return false;
     if (!decor.isDefault && !state.purchasedDecor.contains(decorId)) {
       return false;
     }
     final updated = Map<String, String>.from(state.activeDecor);
     updated[category.name] = decorId;
     state = state.copyWith(activeDecor: updated);
-    PersistenceService.saveState(state);
+
     return true;
   }
 
@@ -1064,13 +1206,13 @@ class GameNotifier extends Notifier<GameState> {
     if (state.bouquetPresets.length >= 5) return false;
     final preset = BouquetPreset(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name.trim().isEmpty ? 'Preset ${state.bouquetPresets.length + 1}' : name.trim(),
+      name: name.trim().isEmpty
+          ? 'Preset ${state.bouquetPresets.length + 1}'
+          : name.trim(),
       flowerIds: state.bouquetWorkspace.map((f) => f.id).toList(),
     );
-    state = state.copyWith(
-      bouquetPresets: [...state.bouquetPresets, preset],
-    );
-    PersistenceService.saveState(state);
+    state = state.copyWith(bouquetPresets: [...state.bouquetPresets, preset]);
+
     return true;
   }
 
@@ -1096,22 +1238,60 @@ class GameNotifier extends Notifier<GameState> {
   /// Delete a saved preset by ID.
   void deletePreset(String presetId) {
     state = state.copyWith(
-      bouquetPresets:
-          state.bouquetPresets.where((p) => p.id != presetId).toList(),
+      bouquetPresets: state.bouquetPresets
+          .where((p) => p.id != presetId)
+          .toList(),
     );
-    PersistenceService.saveState(state);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
+  /// A small community donation keeps a bankrupt shop playable.
+  /// Only enough basic stems to finish the current customer's bouquet are given.
+  bool get needsCommunityFlowers {
+    final order = state.currentOrder;
+    if (order == null || state.dayEnded) return false;
+    final available = unlockedFlowers(state.day).fold<int>(
+      0,
+      (total, flower) => total + (state.inventory[flower.id] ?? 0),
+    );
+    final missing =
+        order.minFlowers - available - state.bouquetWorkspace.length;
+    final unitCost = state.upgrades.hasExtraShelf
+        ? 3
+        : flowerById['daisy']!.cost;
+    return missing > 0 && state.money < missing * unitCost;
+  }
+
+  bool requestCommunityFlowers() {
+    if (!needsCommunityFlowers) return false;
+    final available = unlockedFlowers(state.day).fold<int>(
+      0,
+      (total, flower) => total + (state.inventory[flower.id] ?? 0),
+    );
+    final missing =
+        state.currentOrder!.minFlowers -
+        available -
+        state.bouquetWorkspace.length;
+    state = state.copyWith(
+      inventory: {
+        ...state.inventory,
+        'daisy': (state.inventory['daisy'] ?? 0) + missing,
+      },
+      inventoryDayAdded: {...state.inventoryDayAdded, 'daisy': state.day},
+    );
+    return true;
+  }
+
   bool get canSubmit =>
-      state.bouquetWorkspace.length >=
-      (state.currentOrder?.minFlowers ?? 999);
+      state.bouquetWorkspace.length >= (state.currentOrder?.minFlowers ?? 999);
 
   int effectiveMaxFlowers() =>
-      (state.currentOrder?.maxFlowers ?? 8) + state.upgrades.workspaceBonusSlots;
+      (state.currentOrder?.maxFlowers ?? 8) +
+      state.upgrades.workspaceBonusSlots;
 
-  bool get isAtMaxFlowers => state.bouquetWorkspace.length >= effectiveMaxFlowers();
+  bool get isAtMaxFlowers =>
+      state.bouquetWorkspace.length >= effectiveMaxFlowers();
 
   int? freshnessRemaining(String flowerId) {
     final flower = flowerById[flowerId];
@@ -1129,5 +1309,6 @@ class GameNotifier extends Notifier<GameState> {
   }
 }
 
-final gameProvider =
-    NotifierProvider<GameNotifier, GameState>(GameNotifier.new);
+final gameProvider = NotifierProvider<GameNotifier, GameState>(
+  GameNotifier.new,
+);

@@ -3,25 +3,25 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
   // ── Garden / game palette ──────────────────────────────────────────────────
-  static const gardenGreen      = Color(0xFF2B5E3F);
-  static const gardenGreenDark  = Color(0xFF1A3D29);
-  static const gardenGreenMid   = Color(0xFF3A7A54);
-  static const potTerracotta    = Color(0xFFC4694A);
-  static const potTerracottaDark= Color(0xFF9E4F35);
-  static const potTerracottaLight=Color(0xFFD9896E);
-  static const shelfWoodLight   = Color(0xFFD4A86A);
-  static const shelfWoodMid     = Color(0xFFA87840);
-  static const shelfWoodDark    = Color(0xFF7A5428);
-  static const floorWoodLight   = Color(0xFFDEB887);
-  static const floorWoodMid     = Color(0xFFC49A6C);
-  static const phoneScreen      = Color(0xFF1C1C2E);
+  static const gardenGreen = Color(0xFF2B5E3F);
+  static const gardenGreenDark = Color(0xFF1A3D29);
+  static const gardenGreenMid = Color(0xFF3A7A54);
+  static const potTerracotta = Color(0xFFC4694A);
+  static const potTerracottaDark = Color(0xFF9E4F35);
+  static const potTerracottaLight = Color(0xFFD9896E);
+  static const shelfWoodLight = Color(0xFFD4A86A);
+  static const shelfWoodMid = Color(0xFFA87840);
+  static const shelfWoodDark = Color(0xFF7A5428);
+  static const floorWoodLight = Color(0xFFDEB887);
+  static const floorWoodMid = Color(0xFFC49A6C);
+  static const phoneScreen = Color(0xFF1C1C2E);
   static const phoneScreenLight = Color(0xFF2C2C3E);
-  static const messageBubble    = Color(0xFF3A7A54);
-  static const notifRed         = Color(0xFFE53935);
+  static const messageBubble = Color(0xFF3A7A54);
+  static const notifRed = Color(0xFFE53935);
 
   // ── Base warm palette ──────────────────────────────────────────────────────
-  static const cream = Color(0xFFF5E6D3);
-  static const brown = Color(0xFF8B5E3C);
+  static const cream = Color(0xFFFFF2D1);
+  static const brown = Color(0xFF2B6547);
   static const brownLight = Color(0xFFAD7C52);
   static const brownDark = Color(0xFF5C3A1E);
   static const terracotta = Color(0xFFE8A87C);
@@ -29,9 +29,12 @@ class AppColors {
   static const sage = Color(0xFF7A9E7E);
   static const sageDark = Color(0xFF5A7A5E);
   static const sageLight = Color(0xFFA8C5A0);
-  static const parchment = Color(0xFFFDF3E7);
-  static const warmWhite = Color(0xFFFEF9F4);
-  static const inkBrown = Color(0xFF3D2010);
+  static const parchment = Color(0xFFFFF9E9);
+  static const warmWhite = Color(0xFFFFFCF4);
+  static const inkBrown = Color(0xFF2D4234);
+  static const cartoonInk = Color(0xFF28483A);
+  static const petalCoral = Color(0xFFEF718A);
+  static const sunshine = Color(0xFFFFCF5C);
   static const shadow = Color(0x33000000);
 
   // Accent pops
@@ -77,56 +80,66 @@ class AppColors {
   static const thistlePurple = Color(0xFF886699);
 
   // Seasonal / event-exclusive flowers
-  static const gardeniaBlush    = Color(0xFFF2C4D8); // Valentine's gardenia
+  static const gardeniaBlush = Color(0xFFF2C4D8); // Valentine's gardenia
   static const amaryllisCrimson = Color(0xFFB83A52); // Winter Blooms amaryllis
 }
 
 class AppTheme {
   static ThemeData get theme => ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme(
-          brightness: Brightness.light,
-          primary: AppColors.brown,
-          onPrimary: AppColors.warmWhite,
-          secondary: AppColors.terracotta,
-          onSecondary: AppColors.inkBrown,
-          error: const Color(0xFFE53935),
-          onError: Colors.white,
-          surface: AppColors.cream,
-          onSurface: AppColors.inkBrown,
+    useMaterial3: true,
+    colorScheme: ColorScheme(
+      brightness: Brightness.light,
+      primary: AppColors.brown,
+      onPrimary: AppColors.warmWhite,
+      secondary: AppColors.terracotta,
+      onSecondary: AppColors.inkBrown,
+      error: const Color(0xFFE53935),
+      onError: Colors.white,
+      surface: AppColors.cream,
+      onSurface: AppColors.inkBrown,
+    ),
+    scaffoldBackgroundColor: AppColors.cream,
+    textTheme: GoogleFonts.nunitoTextTheme().copyWith(
+      displayLarge: GoogleFonts.nunito(
+        color: AppColors.inkBrown,
+        fontWeight: FontWeight.w900,
+      ),
+      displayMedium: GoogleFonts.nunito(
+        color: AppColors.inkBrown,
+        fontWeight: FontWeight.w900,
+      ),
+      headlineMedium: GoogleFonts.nunito(
+        color: AppColors.inkBrown,
+        fontWeight: FontWeight.w900,
+      ),
+      bodyLarge: GoogleFonts.nunito(color: AppColors.inkBrown),
+      bodyMedium: GoogleFonts.nunito(color: AppColors.inkBrown),
+      labelLarge: GoogleFonts.nunito(
+        color: AppColors.inkBrown,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.gardenGreenMid,
+        foregroundColor: AppColors.warmWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        elevation: 3,
+        shadowColor: AppColors.cartoonInk.withValues(alpha: 0.35),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.petalCoral,
+        foregroundColor: Colors.white,
+        textStyle: GoogleFonts.nunito(fontWeight: FontWeight.w900),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: AppColors.cartoonInk, width: 2),
         ),
-        scaffoldBackgroundColor: AppColors.cream,
-        textTheme: GoogleFonts.nunitoTextTheme().copyWith(
-          displayLarge: GoogleFonts.playfairDisplay(
-            color: AppColors.inkBrown,
-            fontWeight: FontWeight.bold,
-          ),
-          displayMedium: GoogleFonts.playfairDisplay(
-            color: AppColors.inkBrown,
-            fontWeight: FontWeight.bold,
-          ),
-          headlineMedium: GoogleFonts.playfairDisplay(
-            color: AppColors.inkBrown,
-            fontWeight: FontWeight.w600,
-          ),
-          bodyLarge: GoogleFonts.nunito(color: AppColors.inkBrown),
-          bodyMedium: GoogleFonts.nunito(color: AppColors.inkBrown),
-          labelLarge: GoogleFonts.nunito(
-            color: AppColors.inkBrown,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.brown,
-            foregroundColor: AppColors.warmWhite,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            elevation: 4,
-            shadowColor: AppColors.brownDark.withValues(alpha: 0.4),
-          ),
-        ),
-      );
+        minimumSize: const Size(0, 48),
+      ),
+    ),
+  );
 }

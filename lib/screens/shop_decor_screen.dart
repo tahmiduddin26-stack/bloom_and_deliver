@@ -9,6 +9,7 @@ import '../models/shop_decoration.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/shop_scene.dart';
 
 /// Full-screen shop decoration browser. Players browse categories via a tab
 /// bar, preview items, and buy/equip them with coins.
@@ -42,15 +43,15 @@ class _ShopDecorScreenState extends ConsumerState<ShopDecorScreen>
     final state = ref.watch(gameProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1A2C20),
+      backgroundColor: AppColors.cream,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2A3D2A),
+        backgroundColor: AppColors.gardenGreenDark,
         foregroundColor: Colors.white,
         title: Text(
-          '🎨  Shop Decor',
-          style: GoogleFonts.playfairDisplay(
+          'Dress the Shop',
+          style: GoogleFonts.nunito(
             fontSize: 18,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w900,
             color: Colors.white,
           ),
         ),
@@ -79,7 +80,7 @@ class _ShopDecorScreenState extends ConsumerState<ShopDecorScreen>
           tabAlignment: TabAlignment.start,
           indicatorColor: AppColors.sunflowerGold,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
+          unselectedLabelColor: AppColors.cream,
           labelStyle: GoogleFonts.nunito(
             fontSize: 12,
             fontWeight: FontWeight.w800,
@@ -89,11 +90,42 @@ class _ShopDecorScreenState extends ConsumerState<ShopDecorScreen>
               .toList(),
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
-        children: _categories
-            .map((cat) => _CategoryGrid(category: cat))
-            .toList(),
+      body: Column(
+        children: [
+          Container(
+            height: 136,
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+            decoration: BoxDecoration(
+              color: AppColors.warmWhite,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.cartoonInk, width: 2),
+            ),
+            child: ShopScene(
+              upgrades: state.upgrades,
+              activeDecor: state.activeDecor,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+            child: Text(
+              'Tap a piece to buy it or place it in your shop.',
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.brownDark,
+              ),
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabs,
+              children: _categories
+                  .map((cat) => _CategoryGrid(category: cat))
+                  .toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -127,8 +159,8 @@ class _CategoryGrid extends ConsumerWidget {
       itemBuilder: (_, i) {
         final item = items[i];
         final isActive = item.id == activeId;
-        final isOwned = item.isDefault ||
-            state.purchasedDecor.contains(item.id);
+        final isOwned =
+            item.isDefault || state.purchasedDecor.contains(item.id);
 
         return _DecorCard(
           item: item,
@@ -240,8 +272,9 @@ class _CategoryGrid extends ConsumerWidget {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                final ok =
-                    ref.read(gameProvider.notifier).purchaseDecor(item.id);
+                final ok = ref
+                    .read(gameProvider.notifier)
+                    .purchaseDecor(item.id);
                 if (ok) {
                   AudioService.instance.play(GameSound.coin);
                   // auto-equip on purchase
@@ -252,8 +285,7 @@ class _CategoryGrid extends ConsumerWidget {
                     SnackBar(
                       content: Text(
                         '${item.name} purchased & equipped!',
-                        style:
-                            GoogleFonts.nunito(fontWeight: FontWeight.w700),
+                        style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
                       ),
                       backgroundColor: AppColors.gardenGreenMid,
                       duration: const Duration(seconds: 2),
@@ -306,17 +338,11 @@ class _DecorCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         decoration: BoxDecoration(
-          color: isActive
-              ? AppColors.gardenGreenMid.withValues(alpha: 0.25)
-              : Colors.white.withValues(alpha: 0.07),
+          color: isActive ? const Color(0xFFD9EDBD) : AppColors.warmWhite,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isActive
-                ? AppColors.gardenGreenMid
-                : isOwned
-                    ? Colors.white30
-                    : Colors.white12,
-            width: isActive ? 2 : 1,
+            color: AppColors.cartoonInk,
+            width: isActive ? 3 : 2,
           ),
         ),
         child: Column(
@@ -334,7 +360,7 @@ class _DecorCard extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  color: AppColors.inkBrown,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
@@ -369,7 +395,8 @@ class _DecorPreview extends StatelessWidget {
     switch (item.category) {
       case ShopDecorCategory.wallpaper:
       case ShopDecorCategory.floorTile:
-        final colors = item.gradientColors ??
+        final colors =
+            item.gradientColors ??
             [const Color(0xFF2A3D2A), const Color(0xFF1A2C20)];
         return Container(
           width: 70,
@@ -435,33 +462,33 @@ class _StatusBadge extends StatelessWidget {
       return _chip('✓ Equipped', AppColors.gardenGreenMid);
     }
     if (isOwned) {
-      return _chip('Tap to equip', Colors.white38);
+      return _chip('Tap to equip', AppColors.gardenGreenDark);
     }
     if (cost == 0) {
       return _chip('Free', AppColors.sageDark);
     }
     return _chip(
       '🪙 \$$cost',
-      canAfford ? AppColors.sunflowerGold : AppColors.carnationCoral,
+      canAfford ? AppColors.gardenGreenDark : AppColors.carnationCoral,
     );
   }
 
   Widget _chip(String label, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.20),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.nunito(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            color: color,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.20),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: color.withValues(alpha: 0.4)),
+    ),
+    child: Text(
+      label,
+      style: GoogleFonts.nunito(
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+        color: color,
+      ),
+    ),
+  );
 }
 
 // ── Navigation helper ──────────────────────────────────────────────────────────
@@ -469,15 +496,15 @@ class _StatusBadge extends StatelessWidget {
 Future<void> openShopDecorScreen(BuildContext context) {
   if (!Features.shopDecor) return Future<void>.value();
   return Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const ShopDecorScreen(),
-        transitionsBuilder: (_, anim, __, child) => SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 1),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
-          child: child,
-        ),
+    PageRouteBuilder(
+      pageBuilder: (_, _, _) => const ShopDecorScreen(),
+      transitionsBuilder: (_, anim, _, child) => SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+        child: child,
       ),
-    );
+    ),
+  );
 }

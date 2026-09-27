@@ -50,9 +50,9 @@ class _WindowsillPlotsState extends ConsumerState<WindowsillPlots> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(3, (slot) {
           final plant = plots.cast<GrowingPlant?>().firstWhere(
-                (p) => p?.slot == slot,
-                orElse: () => null,
-              );
+            (p) => p?.slot == slot,
+            orElse: () => null,
+          );
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: _PlotPot(slot: slot, plant: plant),
@@ -99,16 +99,9 @@ class _PlotPot extends ConsumerWidget {
         width: 72,
         height: 76,
         decoration: BoxDecoration(
-          color: isReady
-              ? AppColors.sunflowerGold.withValues(alpha: 0.15)
-              : Colors.black.withValues(alpha: 0.12),
+          color: isReady ? const Color(0xFFFFE6A8) : AppColors.warmWhite,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isReady
-                ? AppColors.sunflowerGold.withValues(alpha: 0.7)
-                : Colors.white.withValues(alpha: 0.12),
-            width: isReady ? 2 : 1,
-          ),
+          border: Border.all(color: AppColors.cartoonInk, width: 1.5),
           boxShadow: isReady
               ? [
                   BoxShadow(
@@ -135,11 +128,8 @@ class _PlotPot extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _SeedPickerSheet(
-        growable: growable,
-        money: money,
-        slot: slot,
-      ),
+      builder: (_) =>
+          _SeedPickerSheet(growable: growable, money: money, slot: slot),
     );
   }
 }
@@ -147,21 +137,25 @@ class _PlotPot extends ConsumerWidget {
 class _EmptySlot extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('🪴', style: TextStyle(fontSize: 22)),
-          const SizedBox(height: 2),
-          Text(
-            'Plant seed',
-            style: GoogleFonts.nunito(
-              fontSize: 9,
-              color: Colors.white.withValues(alpha: 0.40),
-              fontWeight: FontWeight.w600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      );
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      const Icon(
+        Icons.add_circle_outline_rounded,
+        color: AppColors.gardenGreenDark,
+        size: 24,
+      ),
+      const SizedBox(height: 2),
+      Text(
+        'Plant seed',
+        style: GoogleFonts.nunito(
+          fontSize: 9,
+          color: AppColors.gardenGreenDark,
+          fontWeight: FontWeight.w600,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    ],
+  );
 }
 
 class _PlantView extends StatelessWidget {
@@ -175,17 +169,17 @@ class _PlantView extends StatelessWidget {
     final progress = plant.progress;
     final isReady = plant.isReady;
 
-    // Growth stage emoji
-    final stageEmoji = isReady
-        ? (flower?.emoji ?? '🌸')
-        : progress < 0.4
-            ? '🌱'
-            : '🌿';
-
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(stageEmoji, style: const TextStyle(fontSize: 22)),
+        if (isReady && flower != null)
+          FlowerImage(flower: flower, size: 24)
+        else
+          Icon(
+            progress < 0.4 ? Icons.spa_outlined : Icons.spa_rounded,
+            color: AppColors.gardenGreenDark,
+            size: 23,
+          ),
         const SizedBox(height: 3),
         // Progress bar
         Padding(
@@ -195,7 +189,7 @@ class _PlantView extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 4,
-              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              backgroundColor: const Color(0xFFD3DDC7),
               valueColor: AlwaysStoppedAnimation(
                 isReady ? AppColors.sunflowerGold : AppColors.sage,
               ),
@@ -204,13 +198,11 @@ class _PlantView extends StatelessWidget {
         ),
         const SizedBox(height: 3),
         Text(
-          isReady ? 'Tap! 🌸' : plant.timeRemaining,
+          isReady ? 'Harvest!' : plant.timeRemaining,
           style: GoogleFonts.nunito(
             fontSize: 8.5,
             fontWeight: FontWeight.w700,
-            color: isReady
-                ? AppColors.sunflowerGold
-                : Colors.white.withValues(alpha: 0.55),
+            color: AppColors.gardenGreenDark,
           ),
           textAlign: TextAlign.center,
         ),
@@ -236,7 +228,7 @@ class _SeedPickerSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF1C2A1C),
+        color: AppColors.cream,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -248,37 +240,44 @@ class _SeedPickerSheet extends ConsumerWidget {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: AppColors.brownLight,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              const Text('🌱', style: TextStyle(fontSize: 18)),
+              const Icon(
+                Icons.spa_rounded,
+                color: AppColors.gardenGreenDark,
+                size: 23,
+              ),
               const SizedBox(width: 8),
               Text(
                 'Choose a Seed',
                 style: GoogleFonts.nunito(
                   fontSize: 15,
                   fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                  color: AppColors.gardenGreenDark,
                 ),
               ),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: AppColors.gardenGreenMid.withValues(alpha: 0.25),
+                  color: const Color(0xFFFFE6A8),
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.cartoonInk, width: 1.5),
                 ),
                 child: Text(
                   '🪙 \$$money',
                   style: GoogleFonts.nunito(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.sage,
+                    color: AppColors.gardenGreenDark,
                   ),
                 ),
               ),
@@ -289,7 +288,7 @@ class _SeedPickerSheet extends ConsumerWidget {
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: growable.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, i) {
                 final flower = growable[i];
                 final canAfford = money >= (flower.seedPrice ?? 0);
@@ -297,19 +296,21 @@ class _SeedPickerSheet extends ConsumerWidget {
                   flower: flower,
                   canAfford: canAfford,
                   onTap: () {
+                    final messenger = ScaffoldMessenger.of(context);
                     Navigator.pop(context);
                     final ok = ref
                         .read(gameProvider.notifier)
                         .plantSeed(flower.id, slot);
                     if (ok) {
                       AudioService.instance.play(GameSound.flowerDrop);
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      messenger.showSnackBar(
                         SnackBar(
                           content: Text(
                             '🌱 ${flower.name} seed planted! '
                             'Ready in ${flower.growthMinutes} min.',
                             style: GoogleFonts.nunito(
-                                fontWeight: FontWeight.w700),
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                           duration: const Duration(seconds: 3),
                           backgroundColor: AppColors.gardenGreenMid,
@@ -348,11 +349,9 @@ class _SeedRow extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: AppColors.warmWhite,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.10),
-            ),
+            border: Border.all(color: AppColors.cartoonInk, width: 1.5),
           ),
           child: Row(
             children: [
@@ -367,37 +366,37 @@ class _SeedRow extends StatelessWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        color: Colors.white,
+                        color: AppColors.gardenGreenDark,
                       ),
                     ),
                     Text(
                       '⏱ ${flower.growthMinutes} min  •  free flower when ready',
                       style: GoogleFonts.nunito(
                         fontSize: 10,
-                        color: Colors.white.withValues(alpha: 0.50),
+                        color: AppColors.brownDark,
                       ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
-                  gradient: canAfford
-                      ? const LinearGradient(
-                          colors: [Color(0xFF5DBB8A), Color(0xFF3A9068)],
-                        )
-                      : null,
-                  color: canAfford ? null : Colors.white12,
+                  color: canAfford
+                      ? AppColors.sunshine
+                      : const Color(0xFFE2DAC5),
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.cartoonInk, width: 1.5),
                 ),
                 child: Text(
                   '\$${flower.seedPrice}',
                   style: GoogleFonts.nunito(
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
-                    color: Colors.white,
+                    color: AppColors.gardenGreenDark,
                   ),
                 ),
               ),

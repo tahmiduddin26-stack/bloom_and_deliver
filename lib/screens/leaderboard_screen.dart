@@ -19,8 +19,8 @@ void openLeaderboardScreen(BuildContext context) {
   Navigator.of(context).push(
     PageRouteBuilder(
       transitionDuration: const Duration(milliseconds: 380),
-      pageBuilder: (_, __, ___) => const LeaderboardScreen(),
-      transitionsBuilder: (_, anim, __, child) => SlideTransition(
+      pageBuilder: (_, _, _) => const LeaderboardScreen(),
+      transitionsBuilder: (_, anim, _, child) => SlideTransition(
         position: Tween<Offset>(
           begin: const Offset(1, 0),
           end: Offset.zero,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -25,6 +27,8 @@ class _MemoryPopupState extends State<MemoryPopup>
   late final AnimationController _ctrl;
   late final Animation<Offset> _slide;
   late final Animation<double> _fade;
+  Timer? _dismissTimer;
+  bool _dismissing = false;
 
   @override
   void initState() {
@@ -37,21 +41,25 @@ class _MemoryPopupState extends State<MemoryPopup>
       begin: const Offset(0, -1.8),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
-    _fade = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _ctrl, curve: const Interval(0.0, 0.3)),
-    );
+    _fade = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: const Interval(0.0, 0.3)));
     _ctrl.forward();
-    Future.delayed(const Duration(milliseconds: 5000), _dismiss);
+    _dismissTimer = Timer(const Duration(milliseconds: 5000), _dismiss);
   }
 
   @override
   void dispose() {
+    _dismissTimer?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
 
   void _dismiss() {
-    if (!mounted) return;
+    if (!mounted || _dismissing) return;
+    _dismissTimer?.cancel();
+    _dismissing = true;
     _ctrl.reverse().then((_) {
       if (mounted) widget.onDismiss();
     });
@@ -65,8 +73,7 @@ class _MemoryPopupState extends State<MemoryPopup>
     if (snippetIdx == null) return null;
 
     try {
-      final customer =
-          customerPool.firstWhere((c) => c.id == customerId);
+      final customer = customerPool.firstWhere((c) => c.id == customerId);
       if (snippetIdx >= customer.backstorySnippets.length) return null;
       return (
         name: customer.name,
@@ -150,8 +157,9 @@ class _MemoryPopupState extends State<MemoryPopup>
                             style: GoogleFonts.nunito(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.shelfWoodLight
-                                  .withValues(alpha: 0.90),
+                              color: AppColors.shelfWoodLight.withValues(
+                                alpha: 0.90,
+                              ),
                               letterSpacing: 0.4,
                             ),
                           ),

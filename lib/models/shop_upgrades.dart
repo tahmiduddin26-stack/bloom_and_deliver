@@ -4,41 +4,57 @@ enum UpgradeId {
   flowerCooler,
   wrappingStation,
   displayWindow,
+  teaCart,
+  ribbonRack,
+  tipJar,
 }
 
 extension UpgradeInfo on UpgradeId {
   String get title => switch (this) {
-        UpgradeId.workspaceXL => 'Workspace XL',
-        UpgradeId.extraShelf => 'Extra Shelf',
-        UpgradeId.flowerCooler => 'Flower Cooler',
-        UpgradeId.wrappingStation => 'Wrapping Station',
-        UpgradeId.displayWindow => 'Display Window',
-      };
+    UpgradeId.teaCart => 'Tea Cart',
+    UpgradeId.ribbonRack => 'Ribbon Rack',
+    UpgradeId.tipJar => 'Lucky Tip Jar',
+    UpgradeId.workspaceXL => 'Workspace XL',
+    UpgradeId.extraShelf => 'Extra Shelf',
+    UpgradeId.flowerCooler => 'Flower Cooler',
+    UpgradeId.wrappingStation => 'Wrapping Station',
+    UpgradeId.displayWindow => 'Display Window',
+  };
 
   String get description => switch (this) {
-        UpgradeId.workspaceXL =>
-          'Craft bouquets with up to 10 flowers instead of 8',
-        UpgradeId.extraShelf => 'Market restocks cost 10% less',
-        UpgradeId.flowerCooler => 'Flowers stay fresh 1 extra day',
-        UpgradeId.wrappingStation => 'Earn +15% coins on every Great order',
-        UpgradeId.displayWindow => 'Attract 1 extra customer each day',
-      };
+    UpgradeId.teaCart =>
+      'A cup of tea gives every customer 8 more seconds for a quick-service tip',
+    UpgradeId.ribbonRack => 'Quick Great bouquets earn an extra 10% tip',
+    UpgradeId.tipJar => 'Great-order streaks earn 8% per step instead of 5%',
+    UpgradeId.workspaceXL =>
+      'Craft bouquets with up to 10 flowers instead of 8',
+    UpgradeId.extraShelf => 'Market restocks cost 10% less',
+    UpgradeId.flowerCooler => 'Flowers stay fresh 1 extra day',
+    UpgradeId.wrappingStation => 'Earn +15% coins on every Great order',
+    UpgradeId.displayWindow => 'Attract 1 extra customer each day',
+  };
 
   String get emoji => switch (this) {
-        UpgradeId.workspaceXL => '✂️',
-        UpgradeId.extraShelf => '🪴',
-        UpgradeId.flowerCooler => '❄️',
-        UpgradeId.wrappingStation => '🎀',
-        UpgradeId.displayWindow => '🪟',
-      };
+    UpgradeId.teaCart => '🍵',
+    UpgradeId.ribbonRack => '🎗',
+    UpgradeId.tipJar => '🪙',
+    UpgradeId.workspaceXL => '✂️',
+    UpgradeId.extraShelf => '🪴',
+    UpgradeId.flowerCooler => '❄️',
+    UpgradeId.wrappingStation => '🎀',
+    UpgradeId.displayWindow => '🪟',
+  };
 
   int get cost => switch (this) {
-        UpgradeId.workspaceXL => 80,
-        UpgradeId.extraShelf => 60,
-        UpgradeId.flowerCooler => 100,
-        UpgradeId.wrappingStation => 90,
-        UpgradeId.displayWindow => 50,
-      };
+    UpgradeId.teaCart => 250,
+    UpgradeId.ribbonRack => 450,
+    UpgradeId.tipJar => 700,
+    UpgradeId.workspaceXL => 80,
+    UpgradeId.extraShelf => 60,
+    UpgradeId.flowerCooler => 100,
+    UpgradeId.wrappingStation => 90,
+    UpgradeId.displayWindow => 50,
+  };
 }
 
 class ShopUpgrades {
@@ -72,15 +88,15 @@ class ShopUpgrades {
   List<String> toJson() => purchased.map((e) => e.name).toList();
 
   static ShopUpgrades fromJson(List<dynamic> list) => ShopUpgrades(
-        purchased: list
-            .map((e) {
-              try {
-                return UpgradeId.values.firstWhere((id) => id.name == e);
-              } catch (_) {
-                return null;
-              }
-            })
-            .whereType<UpgradeId>()
-            .toSet(),
-      );
+    purchased: list
+        .map((e) {
+          try {
+            return UpgradeId.values.firstWhere((id) => id.name == e);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<UpgradeId>()
+        .toSet(),
+  );
 }

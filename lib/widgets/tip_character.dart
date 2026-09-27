@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -33,6 +35,7 @@ class _TipCharacterState extends State<TipCharacter>
   late final Animation<Offset> _slide;
   late final Animation<double> _fade;
   bool _dismissing = false;
+  Timer? _dismissTimer;
 
   @override
   void initState() {
@@ -48,13 +51,14 @@ class _TipCharacterState extends State<TipCharacter>
     _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
     _ctrl.forward();
 
-    Future.delayed(widget.autoDismissAfter, () {
+    _dismissTimer = Timer(widget.autoDismissAfter, () {
       if (mounted && !_dismissing) _dismiss();
     });
   }
 
   void _dismiss() {
     if (_dismissing) return;
+    _dismissTimer?.cancel();
     setState(() => _dismissing = true);
     _ctrl.reverse().then((_) {
       if (mounted) widget.onDismiss?.call();
@@ -63,6 +67,7 @@ class _TipCharacterState extends State<TipCharacter>
 
   @override
   void dispose() {
+    _dismissTimer?.cancel();
     _ctrl.dispose();
     super.dispose();
   }

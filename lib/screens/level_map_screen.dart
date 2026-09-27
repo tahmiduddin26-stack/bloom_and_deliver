@@ -5,13 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../data/level_data.dart';
+import '../data/flower_data.dart';
+import '../widgets/flower_image.dart';
+import '../widgets/shop_scene.dart';
+import '../models/game_state.dart';
 import '../data/seasonal_events_data.dart';
 import '../providers/game_provider.dart';
-import '../services/analytics_service.dart';
 import '../services/audio_service.dart';
-import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/ambient_petals.dart';
 import '../widgets/daily_challenges_strip.dart';
 import '../widgets/reputation_board.dart';
 import '../widgets/seasonal_banner.dart';
@@ -19,11 +20,9 @@ import '../widgets/story_arc_dialog.dart';
 import 'gem_shop_screen.dart';
 import 'market_screen.dart';
 import 'play_screen.dart';
-import 'shop_decor_screen.dart';
 import 'shop_interior_screen.dart';
+import 'settings_screen.dart';
 import 'town_map_screen.dart';
-import 'upgrades_screen.dart';
-import 'vibe_notebook_screen.dart';
 import 'wholesale_screen.dart';
 
 /// Candy-Crush-style campaign map: a winding garden path of 20 level nodes.
@@ -119,8 +118,8 @@ class _LevelMapScreenState extends ConsumerState<LevelMapScreen> {
     Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 500),
-        pageBuilder: (_, __, ___) => const PlayScreen(),
-        transitionsBuilder: (_, anim, __, child) => FadeTransition(
+        pageBuilder: (_, _, _) => const PlayScreen(),
+        transitionsBuilder: (_, anim, _, child) => FadeTransition(
           opacity: CurvedAnimation(parent: anim, curve: Curves.easeIn),
           child: child,
         ),
@@ -133,103 +132,124 @@ class _LevelMapScreenState extends ConsumerState<LevelMapScreen> {
     final state = ref.watch(gameProvider);
     final nextLevel = state.nextLevel;
     // Show 20 campaign nodes + one endless node once the campaign is done.
-    final nodeCount =
-        nextLevel > maxCampaignLevel ? nextLevel : maxCampaignLevel;
+    final nodeCount = nextLevel > maxCampaignLevel
+        ? nextLevel
+        : maxCampaignLevel;
 
     WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _autoScrollToCurrent(nextLevel, nodeCount));
+      (_) => _autoScrollToCurrent(nextLevel, nodeCount),
+    );
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFCE4EC), // soft pink sky
-              Color(0xFFF8E8F5),
-              Color(0xFFE8F5E9), // meadow green
-              Color(0xFFDCEDC8),
-            ],
-          ),
-        ),
+        decoration: const BoxDecoration(color: Color(0xFFC7E6A4)),
         child: SafeArea(
           child: Stack(
             children: [
-          const Positioned.fill(child: AmbientPetals()),
-          Column(
-            children: [
-              _MapHeader(
-                money: state.money,
-                totalStars: state.totalStars,
-                nextLevel: nextLevel,
-                loginStreak: state.loginStreak,
-                gems: state.gems,
-                onTownMap: _openTownMap,
-              ),
-              // Today's challenges (rewards pay out while playing)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: DailyChallengesStrip(),
-              ),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final width = constraints.maxWidth;
-                    final height = _mapHeight(nodeCount);
-                    final centers = List.generate(
-                        nodeCount, (i) => _nodeCenter(i, width, nodeCount));
-
-                    return SingleChildScrollView(
-                      controller: _scrollCtrl,
-                      child: SizedBox(
-                        width: width,
-                        height: height,
-                        child: Stack(
-                          children: [
-                            // Winding path
-                            CustomPaint(
-                              size: Size(width, height),
-                              painter: _PathPainter(centers: centers),
-                            ),
-                            // Scattered garden doodles
-                            ..._gardenDoodles(width, height),
-                            // Level nodes
-                            for (var i = 0; i < nodeCount; i++)
-                              _positionedNode(i + 1, centers[i], state),
-                            // Finish banner above node 20
-                            if (nodeCount >= maxCampaignLevel)
-                              Positioned(
-                                left: 0,
-                                right: 0,
-                                top: centers[maxCampaignLevel - 1].dy - 108,
-                                child: const _FinishBanner(),
-                              ),
-                          ],
+              Column(
+                children: [
+                  _MapHeader(
+                    money: state.money,
+                    totalStars: state.totalStars,
+                    nextLevel: nextLevel,
+                    loginStreak: state.loginStreak,
+                    gems: state.gems,
+                    onTownMap: _openTownMap,
+                  ),
+                  SizedBox(
+                    height: 106,
+                    width: double.infinity,
+                    child: ShopScene(
+                      upgrades: state.upgrades,
+                      activeDecor: state.activeDecor,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () =>
+                            _playLevel(state.dayEnded ? nextLevel : state.day),
+                        icon: const Icon(Icons.local_florist_outlined),
+                        label: Text(
+                          state.dayEnded
+                              ? '${nextLevel == state.day ? 'Retry' : 'Begin'} level $nextLevel · ${levelForDay(nextLevel).title}'
+                              : 'Continue level ${state.day} · ${state.ordersRemaining} customers',
                         ),
+                      ),
+                    ),
+                  ),
+                  // Today's challenges (rewards pay out while playing)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: DailyChallengesStrip(),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        final height = _mapHeight(nodeCount);
+                        final centers = List.generate(
+                          nodeCount,
+                          (i) => _nodeCenter(i, width, nodeCount),
+                        );
+
+                        return SingleChildScrollView(
+                          controller: _scrollCtrl,
+                          child: SizedBox(
+                            width: width,
+                            height: height,
+                            child: Stack(
+                              children: [
+                                // Winding path
+                                CustomPaint(
+                                  size: Size(width, height),
+                                  painter: _PathPainter(centers: centers),
+                                ),
+                                // Scattered garden doodles
+                                ..._gardenDoodles(width, height),
+                                // Level nodes
+                                for (var i = 0; i < nodeCount; i++)
+                                  _positionedNode(i + 1, centers[i], state),
+                                // Finish banner above node 20
+                                if (nodeCount >= maxCampaignLevel)
+                                  Positioned(
+                                    left: 0,
+                                    right: 0,
+                                    top: centers[maxCampaignLevel - 1].dy - 108,
+                                    child: const _FinishBanner(),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              // Seasonal event banner overlay
+              if (_showSeasonalBanner)
+                Builder(
+                  builder: (context) {
+                    final event = eventForDay(ref.read(gameProvider).day);
+                    if (event == null) return const SizedBox.shrink();
+                    return Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: SeasonalBanner(
+                        event: event,
+                        onDismissed: () =>
+                            setState(() => _showSeasonalBanner = false),
                       ),
                     );
                   },
                 ),
-              ),
-            ],
-          ),
-              // Seasonal event banner overlay
-              if (_showSeasonalBanner)
-                Builder(builder: (context) {
-                  final event = eventForDay(ref.read(gameProvider).day);
-                  if (event == null) return const SizedBox.shrink();
-                  return Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: SeasonalBanner(
-                      event: event,
-                      onDismissed: () =>
-                          setState(() => _showSeasonalBanner = false),
-                    ),
-                  );
-                }),
             ],
           ),
         ),
@@ -237,7 +257,7 @@ class _LevelMapScreenState extends ConsumerState<LevelMapScreen> {
     );
   }
 
-  Widget _positionedNode(int level, Offset center, dynamic state) {
+  Widget _positionedNode(int level, Offset center, GameState state) {
     final stars = state.starsForLevel(level);
     final unlocked = state.isLevelUnlocked(level);
     final isCurrent = level == state.nextLevel;
@@ -274,24 +294,25 @@ class _LevelMapScreenState extends ConsumerState<LevelMapScreen> {
   }
 
   List<Widget> _gardenDoodles(double width, double height) {
-    const doodles = ['🌳', '🌷', '🌻', '🍄', '🦋', '🌿', '🌼', '🐝', '🌸', '🪻'];
     final widgets = <Widget>[];
     var seed = 7;
     for (var y = 60.0; y < height - 40; y += 96) {
       seed = (seed * 31 + 17) % 1000;
       final leftSide = seed.isEven;
       final x = leftSide ? 8.0 + (seed % 30) : width - 46.0 - (seed % 30);
-      widgets.add(Positioned(
-        left: x,
-        top: y,
-        child: Opacity(
-          opacity: 0.55,
-          child: Text(
-            doodles[(y ~/ 96 + seed) % doodles.length],
-            style: TextStyle(fontSize: 22.0 + (seed % 12)),
+      widgets.add(
+        Positioned(
+          left: x,
+          top: y,
+          child: Opacity(
+            opacity: 0.55,
+            child: FlowerImage(
+              flower: allFlowers[(y ~/ 96 + seed) % allFlowers.length],
+              size: 38,
+            ),
           ),
         ),
-      ));
+      );
     }
     return widgets;
   }
@@ -300,13 +321,8 @@ class _LevelMapScreenState extends ConsumerState<LevelMapScreen> {
 // ── Header ─────────────────────────────────────────────────────────────────────
 
 class _MapHeader extends StatelessWidget {
-  final int money;
-  final int totalStars;
-  final int nextLevel;
-  final int loginStreak;
-  final int gems;
+  final int money, totalStars, nextLevel, loginStreak, gems;
   final VoidCallback onTownMap;
-
   const _MapHeader({
     required this.money,
     required this.totalStars,
@@ -317,222 +333,164 @@ class _MapHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFE1BEE7).withValues(alpha: 0.6),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: const Color(0xFF203F35),
+      borderRadius: BorderRadius.circular(24),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'BLOOM & DELIVER',
+          style: GoogleFonts.nunito(
+            fontSize: 10,
+            letterSpacing: 2.5,
+            color: const Color(0xFFE6D3AB),
+            fontWeight: FontWeight.w800,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Text('🌸', style: TextStyle(fontSize: 24)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Bloom & Deliver',
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.inkBrown,
-                  ),
-                ),
-                Text(
-                  nextLevel > maxCampaignLevel
-                      ? 'Campaign complete — endless bloom!'
-                      : 'Level $nextLevel of $maxCampaignLevel',
-                  style: GoogleFonts.nunito(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.brownLight,
-                  ),
-                ),
-              ],
-            ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Your flowering journey',
+          style: GoogleFonts.nunito(
+            fontSize: 24,
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
           ),
-          if (loginStreak >= 2) ...[
-            _HeaderChip(
-              emoji: '🔥',
-              label: loginStreak % 7 == 0 ? '$loginStreak 🎁' : '$loginStreak',
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _HeaderChip(icon: Icons.paid_rounded, label: '$money coins'),
+            InkWell(
+              onTap: () => openGemShop(context, source: 'journey'),
+              child: _HeaderChip(
+                icon: Icons.diamond_rounded,
+                label: '$gems gems',
+              ),
             ),
-            const SizedBox(width: 6),
+            _HeaderChip(icon: Icons.star_rounded, label: '$totalStars stars'),
           ],
-          _HeaderChip(emoji: '⭐', label: '$totalStars'),
-          const SizedBox(width: 6),
-          _HeaderChip(emoji: '🪙', label: '\$$money'),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: () => openGemShop(context, source: 'level_map'),
-            child: _HeaderChip(emoji: '💎', label: '$gems'),
-          ),
-          const SizedBox(width: 6),
-          const _ReminderBell(),
-          if (Features.vibeNotebook) ...[
-            const SizedBox(width: 6),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Coins grow your shop. New stars earn 5 gems each.',
+          style: GoogleFonts.nunito(fontSize: 12, color: Colors.white70),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (Features.townMap)
+              _HeaderIconButton(
+                icon: Icons.map_rounded,
+                label: 'Town',
+                tooltip: 'Explore Bloomfield',
+                onTap: onTownMap,
+              ),
+            if (Features.shopInterior)
+              _HeaderIconButton(
+                icon: Icons.storefront_rounded,
+                label: 'Shop',
+                tooltip: 'Your Flower Shop',
+                onTap: () => openShopInteriorScreen(context),
+              ),
             _HeaderIconButton(
-              emoji: '📓',
-              tooltip: 'Vibe Notebook',
-              onTap: () => openVibeNotebook(context),
+              icon: Icons.local_florist_rounded,
+              label: 'Market',
+              tooltip: 'Flower market',
+              onTap: () => openMarketScreen(context),
             ),
-          ],
-          if (Features.townMap) ...[
-            const SizedBox(width: 6),
             _HeaderIconButton(
-              emoji: '🗺️',
-              tooltip: 'Town Map',
-              onTap: onTownMap,
+              icon: Icons.settings_rounded,
+              label: 'Settings',
+              tooltip: 'Settings',
+              onTap: () => openSettingsScreen(context),
             ),
           ],
-          if (Features.upgrades) ...[
-            const SizedBox(width: 4),
-            _HeaderIconButton(
-              emoji: '🔨',
-              tooltip: 'Shop Upgrades',
-              onTap: () => openUpgradesScreen(context),
-            ),
-          ],
-          if (Features.shopDecor) ...[
-            const SizedBox(width: 4),
-            _HeaderIconButton(
-              emoji: '🎨',
-              tooltip: 'Shop Decor',
-              onTap: () => openShopDecorScreen(context),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
 
 class _HeaderIconButton extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
+  final String label;
   final String tooltip;
   final VoidCallback onTap;
 
   const _HeaderIconButton({
-    required this.emoji,
+    required this.icon,
+    required this.label,
     required this.tooltip,
     required this.onTap,
   });
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-        message: tooltip,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE1BEE7).withValues(alpha: 0.45),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFBA68C8).withValues(alpha: 0.5),
-              ),
-            ),
-            child: Center(
-              child: Text(emoji, style: const TextStyle(fontSize: 15)),
-            ),
-          ),
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      IconButton(
+        onPressed: onTap,
+        tooltip: tooltip,
+        icon: Icon(icon, size: 20),
+        style: IconButton.styleFrom(
+          backgroundColor: const Color(0xFFFFE4A3),
+          foregroundColor: AppColors.gardenGreenDark,
+          side: const BorderSide(color: AppColors.cartoonInk, width: 1.5),
+          minimumSize: const Size(42, 42),
         ),
-      );
-}
-
-// Strictly opt-in daily-reminder toggle. Off by default; enabling it requests
-// notification permission and schedules a single gentle daily reminder.
-class _ReminderBell extends StatefulWidget {
-  const _ReminderBell();
-
-  @override
-  State<_ReminderBell> createState() => _ReminderBellState();
-}
-
-class _ReminderBellState extends State<_ReminderBell> {
-  bool _on = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final v = await NotificationService.instance.isDailyReminderEnabled();
-    if (mounted) setState(() => _on = v);
-  }
-
-  Future<void> _toggle() async {
-    final next = !_on;
-    setState(() => _on = next);
-    AnalyticsService.instance
-        .logEvent('reminder_toggled', {'enabled': next});
-    await NotificationService.instance.setDailyReminder(next);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          next
-              ? '🔔 Lily will send one gentle reminder a day.'
-              : 'Daily reminder turned off.',
-        ),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
       ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) => _HeaderIconButton(
-        emoji: _on ? '🔔' : '🔕',
-        tooltip: _on ? 'Daily reminder on' : 'Daily reminder off',
-        onTap: _toggle,
-      );
+      const SizedBox(height: 2),
+      Text(
+        label,
+        style: GoogleFonts.nunito(
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          color: Colors.white,
+        ),
+      ),
+    ],
+  );
 }
 
 class _HeaderChip extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
   final String label;
 
-  const _HeaderChip({required this.emoji, required this.label});
+  const _HeaderChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8BBD0).withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: const Color(0xFFF48FB1).withValues(alpha: 0.5),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFE8AE),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppColors.cartoonInk, width: 1.5),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: AppColors.gardenGreenDark),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: GoogleFonts.nunito(
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            color: AppColors.inkBrown,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 13)),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: GoogleFonts.nunito(
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                color: AppColors.inkBrown,
-              ),
-            ),
-          ],
-        ),
-      );
+      ],
+    ),
+  );
 }
 
 // ── Path painter ───────────────────────────────────────────────────────────────
@@ -613,9 +571,10 @@ class _LevelNodeState extends State<_LevelNode>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    _pulse = Tween<double>(begin: 1.0, end: 1.09).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
+    _pulse = Tween<double>(
+      begin: 1.0,
+      end: 1.09,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
     if (widget.isCurrent) _pulseCtrl.repeat(reverse: true);
   }
 
@@ -643,10 +602,10 @@ class _LevelNodeState extends State<_LevelNode>
     final circleColors = locked
         ? [Colors.grey.shade400, Colors.grey.shade500]
         : widget.isCurrent
-            ? [const Color(0xFFF06292), const Color(0xFFEC407A)]
-            : widget.isEndless
-                ? [const Color(0xFFBA68C8), const Color(0xFF9C27B0)]
-                : [const Color(0xFF81C784), const Color(0xFF4CAF50)];
+        ? [const Color(0xFFF06292), const Color(0xFFEC407A)]
+        : widget.isEndless
+        ? [const Color(0xFFBA68C8), const Color(0xFF9C27B0)]
+        : [const Color(0xFF81C784), const Color(0xFF4CAF50)];
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -665,21 +624,18 @@ class _LevelNodeState extends State<_LevelNode>
                 height: 58,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: circleColors,
-                  ),
+                  color: circleColors.first,
                   border: Border.all(
-                    color: Colors.white,
-                    width: 3.5,
+                    color: AppColors.gardenGreenDark,
+                    width: 3,
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: circleColors.last.withValues(
-                          alpha: locked ? 0.2 : 0.55),
-                      blurRadius: widget.isCurrent ? 18 : 10,
-                      spreadRadius: widget.isCurrent ? 2 : 0,
+                        alpha: locked ? 0.2 : 0.55,
+                      ),
+                      blurRadius: 0,
+                      spreadRadius: 0,
                       offset: const Offset(0, 4),
                     ),
                   ],
@@ -690,8 +646,13 @@ class _LevelNodeState extends State<_LevelNode>
                       : Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(widget.def.emoji,
-                                style: const TextStyle(fontSize: 17)),
+                            Icon(
+                              widget.def.isRush
+                                  ? Icons.bolt_rounded
+                                  : Icons.local_florist_rounded,
+                              size: 17,
+                              color: Colors.white,
+                            ),
                             Text(
                               '${widget.def.number}',
                               style: GoogleFonts.nunito(
@@ -797,91 +758,96 @@ class _LevelSheet extends StatelessWidget {
       ),
       child: SingleChildScrollView(
         child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(def.emoji, style: const TextStyle(fontSize: 40)),
-          const SizedBox(height: 6),
-          Text(
-            'Level ${def.number} — ${def.title}',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppColors.inkBrown,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            def.subtitle,
-            style: GoogleFonts.nunito(
-              fontSize: 13,
-              fontStyle: FontStyle.italic,
-              color: AppColors.brownLight,
-            ),
-          ),
-          const SizedBox(height: 10),
-          // Best stars
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(3, (i) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Text(
-                  i < stars ? '⭐' : '☆',
-                  style: TextStyle(
-                    fontSize: 26,
-                    color: i < stars ? null : Colors.grey.shade400,
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 10),
-          // Star goals
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8BBD0).withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              children: [
-                _GoalRow(stars: '⭐', text: 'Serve every customer'),
-                _GoalRow(stars: '⭐⭐', text: 'Earn \$${def.star2Earnings}'),
-                _GoalRow(stars: '⭐⭐⭐', text: 'Earn \$${def.star3Earnings}'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            def.unlockText,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.brownLight,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: onPlay,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 52),
-              backgroundColor: const Color(0xFFEC407A),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(def.emoji, style: const TextStyle(fontSize: 40)),
+            const SizedBox(height: 6),
+            Text(
+              'Level ${def.number} — ${def.title}',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.playfairDisplay(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.inkBrown,
               ),
             ),
-            child: Text(
-              isCurrent ? 'Play  🌸' : (stars > 0 ? 'Replay  🔁' : 'Play  🌸'),
+            const SizedBox(height: 2),
+            Text(
+              def.subtitle,
               style: GoogleFonts.nunito(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+                color: AppColors.brownLight,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 10),
+            // Best stars
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(3, (i) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(
+                    i < stars ? '⭐' : '☆',
+                    style: TextStyle(
+                      fontSize: 26,
+                      color: i < stars ? null : Colors.grey.shade400,
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 10),
+            // Star goals
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8BBD0).withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                children: [
+                  _GoalRow(
+                    stars: '⭐',
+                    text: 'Finish all orders and earn \$${def.star1Earnings}',
+                  ),
+                  _GoalRow(stars: '⭐⭐', text: 'Earn \$${def.star2Earnings}'),
+                  _GoalRow(stars: '⭐⭐⭐', text: 'Earn \$${def.star3Earnings}'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              def.unlockText,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.brownLight,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onPlay,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 52),
+                backgroundColor: const Color(0xFFEC407A),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: Text(
+                isCurrent
+                    ? 'Play  🌸'
+                    : (stars > 0 ? 'Replay  🔁' : 'Play  🌸'),
+                style: GoogleFonts.nunito(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -896,26 +862,26 @@ class _GoalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 52,
-              child: Text(stars, style: const TextStyle(fontSize: 11)),
-            ),
-            Expanded(
-              child: Text(
-                text,
-                style: GoogleFonts.nunito(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.inkBrown,
-                ),
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 52,
+          child: Text(stars, style: const TextStyle(fontSize: 11)),
         ),
-      );
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.nunito(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.inkBrown,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Convenience: open the level map, clearing everything else off the stack.
@@ -923,8 +889,8 @@ void openLevelMapAsRoot(BuildContext context) {
   Navigator.of(context).pushAndRemoveUntil(
     PageRouteBuilder(
       transitionDuration: const Duration(milliseconds: 500),
-      pageBuilder: (_, __, ___) => const LevelMapScreen(),
-      transitionsBuilder: (_, anim, __, child) => FadeTransition(
+      pageBuilder: (_, _, _) => const LevelMapScreen(),
+      transitionsBuilder: (_, anim, _, child) => FadeTransition(
         opacity: CurvedAnimation(parent: anim, curve: Curves.easeIn),
         child: child,
       ),

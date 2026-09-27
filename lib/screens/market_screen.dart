@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../data/flash_sale_data.dart';
 import '../data/flower_data.dart';
 import '../data/seasonal_events_data.dart';
+import '../data/wholesale_data.dart';
 import '../models/flower.dart';
 import '../models/seasonal_event.dart';
 import '../providers/game_provider.dart';
@@ -51,8 +52,10 @@ class _MarketScreenState extends ConsumerState<MarketScreen>
       vsync: this,
       duration: const Duration(milliseconds: 480),
     );
-    _slideIn = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic));
+    _slideIn = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic));
     _slideCtrl.forward();
 
     _countdown = flashSaleCountdown();
@@ -77,23 +80,39 @@ class _MarketScreenState extends ConsumerState<MarketScreen>
     TipCharacterType char;
 
     if (money < 25) {
-      tip = "Your wallet's looking thin! Only buy what you really need — save some for tomorrow. 💸";
+      tip =
+          "Your wallet's looking thin! Only buy what you really need — save some for tomorrow. 💸";
       char = TipCharacterType.helper;
     } else if (totalStock < 12) {
-      tip = "Your shelves are almost empty! Stock up — customers hate seeing bare pots. 🪴";
+      tip =
+          "Your shelves are almost empty! Stock up — customers hate seeing bare pots. 🪴";
       char = TipCharacterType.florist;
     } else if (nextUnlock != -1 && day == nextUnlock - 1) {
-      tip = "New exotic flowers unlock tomorrow on Day $nextUnlock! Come back to the market then. ✨";
+      tip =
+          "New exotic flowers unlock tomorrow on Day $nextUnlock! Come back to the market then. ✨";
       char = TipCharacterType.florist;
     } else if (day == 1) {
-      tip = "Welcome to the market! Buy a good mix of flowers — variety helps you match any vibe! 🌸";
+      tip =
+          "Welcome to the market! Buy a good mix of flowers — variety helps you match any vibe! 🌸";
       char = TipCharacterType.florist;
     } else {
       const tips = [
-        ("Match stock to your regulars — they love their favourite flowers! ⭐", TipCharacterType.helper),
-        ("Roses and tulips are great for romantic orders. Sunflowers for cheerful vibes! 🌻", TipCharacterType.florist),
-        ("Buy at least 5 of each — you'll burn through stock faster than you think! 📦", TipCharacterType.helper),
-        ("Lavender and baby's breath add elegance. Great for those mysterious customers. 💜", TipCharacterType.florist),
+        (
+          "Match stock to your regulars — they love their favourite flowers! ⭐",
+          TipCharacterType.helper,
+        ),
+        (
+          "Roses and tulips are great for romantic orders. Sunflowers for cheerful vibes! 🌻",
+          TipCharacterType.florist,
+        ),
+        (
+          "Buy at least 5 of each — you'll burn through stock faster than you think! 📦",
+          TipCharacterType.helper,
+        ),
+        (
+          "Lavender and baby's breath add elegance. Great for those mysterious customers. 💜",
+          TipCharacterType.florist,
+        ),
       ];
       final pick = tips[day % tips.length];
       tip = pick.$1;
@@ -138,7 +157,9 @@ class _MarketScreenState extends ConsumerState<MarketScreen>
     // Compute clearance items once here so both banner and grid can use them
     final notifier = ref.read(gameProvider.notifier);
     final clearanceIds = state.inventory.keys
-        .where((id) => notifier.isNearlyWilted(id) && (state.inventory[id] ?? 0) > 0)
+        .where(
+          (id) => notifier.isNearlyWilted(id) && (state.inventory[id] ?? 0) > 0,
+        )
         .toList();
 
     // Active flash sales
@@ -148,17 +169,7 @@ class _MarketScreenState extends ConsumerState<MarketScreen>
       body: SlideTransition(
         position: _slideIn,
         child: Container(
-          // Sandy market background
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFFF0DFA8),
-                Color(0xFFE2C87A),
-              ],
-            ),
-          ),
+          decoration: const BoxDecoration(color: AppColors.cream),
           child: SafeArea(
             child: Stack(
               children: [
@@ -191,16 +202,14 @@ class _MarketScreenState extends ConsumerState<MarketScreen>
                     // Footer
                     _MarketFooter(
                       spent: state.restockSpentToday,
-                      // startNextDay jumps to the campaign frontier after a
-                      // replay, so show the day it will actually start.
-                      nextDay: state.nextLevel > state.day
-                          ? state.nextLevel
-                          : state.day + 1,
+                      nextDay: state.nextLevel,
+                      retry: state.dayEnded && state.nextLevel == state.day,
                       onStartDay: widget.onStartNextDay == null
                           ? null
                           : () {
-                              AudioService.instance
-                                  .play(GameSound.notification);
+                              AudioService.instance.play(
+                                GameSound.notification,
+                              );
                               Navigator.of(context).pop();
                               widget.onStartNextDay!();
                             },
@@ -272,7 +281,9 @@ class _FlashSaleBanner extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  sales.map((s) => flowerById[s.flowerId]?.name ?? '').join(' & '),
+                  sales
+                      .map((s) => flowerById[s.flowerId]?.name ?? '')
+                      .join(' & '),
                   style: GoogleFonts.nunito(
                     fontSize: 10,
                     color: Colors.white.withValues(alpha: 0.9),
@@ -330,22 +341,22 @@ class _MarketHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF5C3A1E), Color(0xFF8B5E3C)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        color: AppColors.gardenGreenDark,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 8,
+            blurRadius: 0,
             offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Row(
         children: [
-          const Text('🛒', style: TextStyle(fontSize: 20)),
+          const Icon(
+            Icons.local_florist_rounded,
+            color: AppColors.sunshine,
+            size: 26,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -353,9 +364,9 @@ class _MarketHeader extends StatelessWidget {
               children: [
                 Text(
                   'Flower Market',
-                  style: GoogleFonts.playfairDisplay(
+                  style: GoogleFonts.nunito(
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w900,
                     color: AppColors.warmWhite,
                   ),
                 ),
@@ -370,35 +381,36 @@ class _MarketHeader extends StatelessWidget {
             ),
           ),
           // Wholesale button
-          if (Features.wholesale)
+          if (Features.wholesale && day >= wholesaleUnlockDay)
             GestureDetector(
               onTap: () => openWholesaleScreen(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-              margin: const EdgeInsets.only(right: 8),
-              decoration: BoxDecoration(
-                color: AppColors.gardenGreenMid.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: AppColors.gardenGreenMid.withValues(alpha: 0.5)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('🏭', style: TextStyle(fontSize: 12)),
-                  const SizedBox(width: 3),
-                  Text(
-                    'Wholesale',
-                    style: GoogleFonts.nunito(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.warmWhite,
-                    ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.gardenGreenMid.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.gardenGreenMid.withValues(alpha: 0.5),
                   ),
-                ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🏭', style: TextStyle(fontSize: 12)),
+                    const SizedBox(width: 3),
+                    Text(
+                      'Wholesale',
+                      style: GoogleFonts.nunito(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.warmWhite,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
           // Money remaining
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -444,13 +456,11 @@ class _MarketAwning extends StatelessWidget {
           (i) => Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: i.isEven
-                    ? const Color(0xFF4A8A5A)  // green stripe
-                    : const Color(0xFFF5F0E8), // cream stripe
+                color: i.isEven ? AppColors.petalCoral : AppColors.warmWhite,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 4,
+                    blurRadius: 0,
                     offset: const Offset(0, 2),
                   ),
                 ],
@@ -473,19 +483,14 @@ class _CounterLedge extends StatelessWidget {
     return Container(
       height: 20,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.shelfWoodLight,
-            AppColors.shelfWoodMid,
-            AppColors.shelfWoodDark,
-          ],
+        color: AppColors.shelfWoodLight,
+        border: const Border(
+          top: BorderSide(color: AppColors.cartoonInk, width: 2),
         ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 8,
+            blurRadius: 0,
             offset: const Offset(0, -2),
           ),
         ],
@@ -540,21 +545,30 @@ class _FlowerGrid extends StatelessWidget {
     // Item list: regular flowers, optional teaser, optional event section header + flowers
     final items = <_GridItem>[
       for (final f in regular)
-        _GridItem.flower(f, inventory[f.id] ?? 0, money >= (saleMap[f.id]?.discountedCost ?? f.cost),
-            sale: saleMap[f.id]),
+        _GridItem.flower(
+          f,
+          inventory[f.id] ?? 0,
+          money >= (saleMap[f.id]?.discountedCost ?? f.cost),
+          sale: saleMap[f.id],
+        ),
       if (locked.isNotEmpty)
         _GridItem.lockedTeaser(locked.first.unlockDay, locked.take(3).toList()),
       if (hasEvent) ...[
         _GridItem.eventHeader(activeEvent!),
         for (final f in eventFlowers)
-          _GridItem.flower(f, inventory[f.id] ?? 0, money >= f.cost, isEvent: true),
+          _GridItem.flower(
+            f,
+            inventory[f.id] ?? 0,
+            money >= f.cost,
+            isEvent: true,
+          ),
       ],
     ];
 
     final hasClearance = clearanceIds.isNotEmpty;
 
     return Container(
-      color: const Color(0xFFD4B87A).withValues(alpha: 0.4),
+      color: AppColors.cream,
       child: CustomScrollView(
         slivers: [
           SliverPadding(
@@ -573,24 +587,24 @@ class _FlowerGrid extends StatelessWidget {
                   // FittedBox: the bucket's content is fixed-size, so scale it
                   // down instead of overflowing on narrow grid cells.
                   _GridItemType.flower => Center(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: _FlowerBucket(
-                          flower: item.flower!,
-                          currentStock: item.stock!,
-                          canAfford: item.canAfford!,
-                          isEventExclusive: item.isEvent,
-                          flashSale: item.sale,
-                        ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _FlowerBucket(
+                        flower: item.flower!,
+                        currentStock: item.stock!,
+                        canAfford: item.canAfford!,
+                        isEventExclusive: item.isEvent,
+                        flashSale: item.sale,
                       ),
                     ),
+                  ),
                   _GridItemType.lockedTeaser => _LockedTeaser(
-                      nextUnlockDay: item.nextUnlockDay!,
-                      previewFlowers: item.previewFlowers!,
-                    ),
+                    nextUnlockDay: item.nextUnlockDay!,
+                    previewFlowers: item.previewFlowers!,
+                  ),
                   _GridItemType.eventHeader => _EventSectionHeader(
-                      event: item.event!,
-                    ),
+                    event: item.event!,
+                  ),
                 };
               },
             ),
@@ -633,16 +647,20 @@ class _GridItem {
     this.sale,
   });
 
-  factory _GridItem.flower(Flower f, int stock, bool canAfford,
-          {bool isEvent = false, FlashSale? sale}) =>
-      _GridItem._(
-        type: _GridItemType.flower,
-        flower: f,
-        stock: stock,
-        canAfford: canAfford,
-        isEvent: isEvent,
-        sale: sale,
-      );
+  factory _GridItem.flower(
+    Flower f,
+    int stock,
+    bool canAfford, {
+    bool isEvent = false,
+    FlashSale? sale,
+  }) => _GridItem._(
+    type: _GridItemType.flower,
+    flower: f,
+    stock: stock,
+    canAfford: canAfford,
+    isEvent: isEvent,
+    sale: sale,
+  );
 
   factory _GridItem.lockedTeaser(int nextDay, List<Flower> preview) =>
       _GridItem._(
@@ -699,7 +717,9 @@ class _ClearanceSection extends ConsumerWidget {
 
     // Re-filter so UI reacts as items are sold
     final active = clearanceIds
-        .where((id) => (state.inventory[id] ?? 0) > 0 && notifier.isNearlyWilted(id))
+        .where(
+          (id) => (state.inventory[id] ?? 0) > 0 && notifier.isNearlyWilted(id),
+        )
         .toList();
 
     if (active.isEmpty) return const SizedBox.shrink();
@@ -709,7 +729,9 @@ class _ClearanceSection extends ConsumerWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFFF3E0),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.5)),
+        border: Border.all(
+          color: const Color(0xFFFF9800).withValues(alpha: 0.5),
+        ),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFFF9800).withValues(alpha: 0.12),
@@ -729,7 +751,9 @@ class _ClearanceSection extends ConsumerWidget {
               gradient: const LinearGradient(
                 colors: [Color(0xFFFF8C00), Color(0xFFFFB347)],
               ),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(15),
+              ),
             ),
             child: Row(
               children: [
@@ -858,7 +882,10 @@ class _ClearanceRow extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFF9800).withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(6),
@@ -897,7 +924,11 @@ class _SellBtn extends StatelessWidget {
   final VoidCallback onTap;
   final bool primary;
 
-  const _SellBtn({required this.label, required this.onTap, this.primary = false});
+  const _SellBtn({
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -912,7 +943,9 @@ class _SellBtn extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: primary
               ? null
-              : Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.5)),
+              : Border.all(
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.5),
+                ),
         ),
         child: Text(
           label,
@@ -960,9 +993,10 @@ class _FlowerBucketState extends ConsumerState<_FlowerBucket>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _pop = Tween<double>(begin: 1.0, end: 1.2).animate(
-      CurvedAnimation(parent: _popCtrl, curve: Curves.easeOutBack),
-    );
+    _pop = Tween<double>(
+      begin: 1.0,
+      end: 1.2,
+    ).animate(CurvedAnimation(parent: _popCtrl, curve: Curves.easeOutBack));
   }
 
   @override
@@ -974,11 +1008,9 @@ class _FlowerBucketState extends ConsumerState<_FlowerBucket>
   void _buy(int qty) {
     HapticFeedback.lightImpact();
     final costPerUnit = widget.flashSale?.discountedCost;
-    final success = ref.read(gameProvider.notifier).restockFlower(
-          widget.flower.id,
-          qty,
-          costPerUnit: costPerUnit,
-        );
+    final success = ref
+        .read(gameProvider.notifier)
+        .restockFlower(widget.flower.id, qty, costPerUnit: costPerUnit);
     if (success) {
       AudioService.instance.play(GameSound.coin);
       _popCtrl.forward(from: 0);
@@ -997,164 +1029,174 @@ class _FlowerBucketState extends ConsumerState<_FlowerBucket>
     final canBuy5 = money >= effectiveCost * 5;
     final onSale = widget.flashSale != null;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Flower emoji above bucket (with event sparkle badge if exclusive)
-        Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            ScaleTransition(
-              scale: _pop,
-              child: FlowerImage(flower: widget.flower, size: 38),
-            ),
-            if (widget.isEventExclusive)
-              Positioned(
-                top: -4,
-                right: -6,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE67E22),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text('✨',
-                      style: TextStyle(fontSize: 8)),
-                ),
-              ),
-            // 🔥 flash sale badge
-            if (onSale)
-              Positioned(
-                top: -4,
-                left: -6,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8400A),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text('🔥',
-                      style: TextStyle(fontSize: 8)),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 2),
-        // Metal bucket
-        Container(
-          width: 58,
-          height: 52,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: onSale
-                  ? const [Color(0xFF7A3A1E), Color(0xFF4A1E0E)]
-                  : const [Color(0xFF6A6A6A), Color(0xFF3A3A3A)],
-            ),
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(10),
-              bottomRight: Radius.circular(10),
-              topLeft: Radius.circular(4),
-              topRight: Radius.circular(4),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.4),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
+    return Container(
+      width: 94,
+      padding: const EdgeInsets.fromLTRB(5, 7, 5, 6),
+      decoration: BoxDecoration(
+        color: AppColors.warmWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cartoonInk, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xFFD7C8A0),
+            blurRadius: 0,
+            offset: Offset(2, 3),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Flower illustration above the planter
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
             children: [
-              Text(
-                '$stock',
-                style: GoogleFonts.nunito(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: stock > 0 ? Colors.white : Colors.white38,
-                ),
+              ScaleTransition(
+                scale: _pop,
+                child: FlowerImage(flower: widget.flower, size: 38),
               ),
-              Text(
-                'in stock',
-                style: GoogleFonts.nunito(
-                  fontSize: 7.5,
-                  color: Colors.white.withValues(alpha: 0.55),
+              if (widget.isEventExclusive)
+                Positioned(
+                  top: -4,
+                  right: -6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 3,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE67E22),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('✨', style: TextStyle(fontSize: 8)),
+                  ),
                 ),
-              ),
+              // 🔥 flash sale badge
+              if (onSale)
+                Positioned(
+                  top: -4,
+                  left: -6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 3,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8400A),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('🔥', style: TextStyle(fontSize: 8)),
+                  ),
+                ),
             ],
           ),
-        ),
-        // Bucket rim
-        Container(
-          width: 64,
-          height: 7,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: onSale
-                  ? const [Color(0xFFAA5533), Color(0xFF7A3322)]
-                  : const [Color(0xFF888888), Color(0xFF555555)],
+          const SizedBox(height: 2),
+          // Illustrated terracotta pot
+          Container(
+            width: 58,
+            height: 52,
+            decoration: BoxDecoration(
+              color: onSale ? AppColors.petalCoral : AppColors.potTerracotta,
+              border: Border.all(color: AppColors.cartoonInk, width: 2),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(10),
+                bottomRight: Radius.circular(10),
+                topLeft: Radius.circular(4),
+                topRight: Radius.circular(4),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  blurRadius: 0,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-        const SizedBox(height: 4),
-        // Flower name
-        Text(
-          widget.flower.name,
-          style: GoogleFonts.nunito(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w700,
-            color: AppColors.inkBrown,
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        // Price — strikethrough original + sale price when on sale
-        if (onSale) ...[
-          Text(
-            '\$${widget.flower.cost} ea',
-            style: GoogleFonts.nunito(
-              fontSize: 8,
-              color: AppColors.brownLight.withValues(alpha: 0.6),
-              decoration: TextDecoration.lineThrough,
-              decorationColor: AppColors.brownLight,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '$stock',
+                  style: GoogleFonts.nunito(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: stock > 0 ? Colors.white : Colors.white38,
+                  ),
+                ),
+                Text(
+                  'in stock',
+                  style: GoogleFonts.nunito(
+                    fontSize: 7.5,
+                    color: Colors.white.withValues(alpha: 0.55),
+                  ),
+                ),
+              ],
             ),
           ),
+          // Bucket rim
+          Container(
+            width: 64,
+            height: 7,
+            decoration: BoxDecoration(
+              color: AppColors.potTerracottaLight,
+              border: Border.all(color: AppColors.cartoonInk, width: 1.5),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Flower name
           Text(
-            '\$${widget.flashSale!.discountedCost} ea',
+            widget.flower.name,
             style: GoogleFonts.nunito(
               fontSize: 9.5,
-              color: const Color(0xFFE8400A),
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
+              color: AppColors.inkBrown,
             ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ] else
-          Text(
-            '\$${widget.flower.cost} ea',
-            style: GoogleFonts.nunito(
-              fontSize: 9,
-              color: AppColors.brownDark.withValues(alpha: 0.7),
-              fontWeight: FontWeight.w600,
+          // Price — strikethrough original + sale price when on sale
+          if (onSale) ...[
+            Text(
+              '\$${widget.flower.cost} ea',
+              style: GoogleFonts.nunito(
+                fontSize: 8,
+                color: AppColors.brownLight.withValues(alpha: 0.6),
+                decoration: TextDecoration.lineThrough,
+                decorationColor: AppColors.brownLight,
+              ),
             ),
+            Text(
+              '\$${widget.flashSale!.discountedCost} ea',
+              style: GoogleFonts.nunito(
+                fontSize: 9.5,
+                color: const Color(0xFFE8400A),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ] else
+            Text(
+              '\$${widget.flower.cost} ea',
+              style: GoogleFonts.nunito(
+                fontSize: 9,
+                color: AppColors.brownDark.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          const SizedBox(height: 4),
+          // Buy buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _BuyBtn(label: '+1', enabled: canBuy1, onTap: () => _buy(1)),
+              const SizedBox(width: 4),
+              _BuyBtn(label: '+5', enabled: canBuy5, onTap: () => _buy(5)),
+            ],
           ),
-        const SizedBox(height: 4),
-        // Buy buttons
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _BuyBtn(label: '+1', enabled: canBuy1, onTap: () => _buy(1)),
-            const SizedBox(width: 4),
-            _BuyBtn(label: '+5', enabled: canBuy5, onTap: () => _buy(5)),
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -1182,11 +1224,12 @@ class _BuyBtn extends StatelessWidget {
               ? AppColors.gardenGreenMid
               : AppColors.brownLight.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.cartoonInk, width: 1.5),
           boxShadow: enabled
               ? [
                   BoxShadow(
                     color: AppColors.gardenGreenMid.withValues(alpha: 0.4),
-                    blurRadius: 4,
+                    blurRadius: 0,
                     offset: const Offset(0, 2),
                   ),
                 ]
@@ -1197,7 +1240,7 @@ class _BuyBtn extends StatelessWidget {
           style: GoogleFonts.nunito(
             fontSize: 10,
             fontWeight: FontWeight.w900,
-            color: enabled ? Colors.white : Colors.white38,
+            color: enabled ? Colors.white : AppColors.brownDark,
           ),
         ),
       ),
@@ -1235,10 +1278,12 @@ class _LockedTeaser extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: previewFlowers
-                .map((f) => Opacity(
-                      opacity: 0.3,
-                      child: FlowerImage(flower: f, size: 20),
-                    ))
+                .map(
+                  (f) => Opacity(
+                    opacity: 0.3,
+                    child: FlowerImage(flower: f, size: 20),
+                  ),
+                )
                 .toList(),
           ),
           const SizedBox(height: 4),
@@ -1268,12 +1313,14 @@ class _LockedTeaser extends StatelessWidget {
 class _MarketFooter extends StatelessWidget {
   final int spent;
   final int nextDay;
+  final bool retry;
   final VoidCallback? onStartDay;
   final VoidCallback onClose;
 
   const _MarketFooter({
     required this.spent,
     required this.nextDay,
+    required this.retry,
     required this.onStartDay,
     required this.onClose,
   });
@@ -1309,10 +1356,12 @@ class _MarketFooter extends StatelessWidget {
                 ),
                 Text(
                   '-\$$spent',
-                  style: GoogleFonts.playfairDisplay(
+                  style: GoogleFonts.nunito(
                     fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: spent > 0 ? AppColors.potTerracottaDark : AppColors.brownLight,
+                    fontWeight: FontWeight.w900,
+                    color: spent > 0
+                        ? AppColors.potTerracottaDark
+                        : AppColors.brownLight,
                   ),
                 ),
               ],
@@ -1323,10 +1372,17 @@ class _MarketFooter extends StatelessWidget {
             flex: 2,
             child: ElevatedButton.icon(
               onPressed: onStartDay ?? onClose,
-              icon: Text(onStartDay != null ? '🌅' : '🌷',
-                  style: const TextStyle(fontSize: 18)),
+              icon: Icon(
+                onStartDay != null
+                    ? Icons.local_florist_rounded
+                    : Icons.check_circle_rounded,
+              ),
               label: Text(
-                onStartDay != null ? 'Start Day $nextDay →' : 'Done  ✓',
+                onStartDay != null
+                    ? retry
+                          ? 'Retry Level $nextDay →'
+                          : 'Start Level $nextDay →'
+                    : 'Done  ✓',
                 style: GoogleFonts.nunito(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -1337,7 +1393,7 @@ class _MarketFooter extends StatelessWidget {
                 backgroundColor: AppColors.gardenGreenMid,
                 foregroundColor: Colors.white,
                 shadowColor: AppColors.gardenGreenDark.withValues(alpha: 0.5),
-                elevation: 4,
+                elevation: 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -1358,9 +1414,8 @@ Future<void> openMarketScreen(
 }) {
   return Navigator.of(context).push(
     PageRouteBuilder(
-      pageBuilder: (_, __, ___) =>
-          MarketScreen(onStartNextDay: onStartNextDay),
-      transitionsBuilder: (_, anim, __, child) {
+      pageBuilder: (_, _, _) => MarketScreen(onStartNextDay: onStartNextDay),
+      transitionsBuilder: (_, anim, _, child) {
         return SlideTransition(
           position: Tween<Offset>(
             begin: const Offset(0, 1),

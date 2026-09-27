@@ -1,5 +1,9 @@
 # Bloom & Deliver — Road to Ship
 
+> Historical research and implementation plan. See
+> [CURRENT_GAME_PLAN.md](CURRENT_GAME_PLAN.md) for the current build status;
+> several counts and art/audio descriptions below predate the redesign.
+
 A phased plan from the current build to a store-ready launch, grounded in (a) a headless
 simulation of the actual game (`test/sim_test.dart`), and (b) research into shipped cozy
 shop-sim and flower games.

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,8 @@ import '../services/analytics_service.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/flower_image.dart';
+import '../widgets/bouquet_preview.dart';
+import '../widgets/customer_avatar.dart';
 import 'level_map_screen.dart';
 
 // ── Interactive tutorial ──────────────────────────────────────────────────────
@@ -54,13 +58,13 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     'map_intro',
   ];
 
-  static const _gradients = [
-    [Color(0xFFFFF0F5), Color(0xFFFCE4EC)],
-    [Color(0xFFF1FFF5), Color(0xFFE8F5E9)],
-    [Color(0xFFFFFDE7), Color(0xFFFFF8E1)],
-    [Color(0xFFFDEFF4), Color(0xFFFCE4EC)],
-    [Color(0xFFF3EFFF), Color(0xFFEDE7F6)],
-    [Color(0xFFF5F0FF), Color(0xFFF3E5F5)],
+  static const _stepColors = [
+    Color(0xFFFFE7D9),
+    Color(0xFFDDF0D1),
+    Color(0xFFFFF0C6),
+    Color(0xFFFFDDE1),
+    Color(0xFFE8E1F7),
+    Color(0xFFD8EBC6),
   ];
 
   static const _lastStep = 5;
@@ -135,8 +139,8 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 600),
-        pageBuilder: (_, __, ___) => const LevelMapScreen(),
-        transitionsBuilder: (_, anim, __, child) => FadeTransition(
+        pageBuilder: (_, _, _) => const LevelMapScreen(),
+        transitionsBuilder: (_, anim, _, child) => FadeTransition(
           opacity: CurvedAnimation(parent: anim, curve: Curves.easeIn),
           child: child,
         ),
@@ -151,13 +155,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     return Scaffold(
       body: AnimatedContainer(
         duration: const Duration(milliseconds: 450),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: _gradients[_step],
-          ),
-        ),
+        decoration: BoxDecoration(color: _stepColors[_step]),
         child: Stack(
           children: [
             const _FloatingDecorations(),
@@ -241,8 +239,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
   static const _customerNote =
       '"It\'s our anniversary tonight. Something romantic would be perfect. 💕"';
 
-  List<Flower> get _trayFlowers =>
-      [for (final id in _trayIds) flowerById[id]!];
+  List<Flower> get _trayFlowers => [for (final id in _trayIds) flowerById[id]!];
 }
 
 // ── Dialog step (character + speech card) ─────────────────────────────────────
@@ -261,7 +258,9 @@ class _DialogStep extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _FloatWrap(child: _CharacterCircle(character: character, isLily: isLily)),
+          _FloatWrap(
+            child: _CharacterCircle(character: character, isLily: isLily),
+          ),
           const SizedBox(height: 28),
           _SpeechCard(isLily: isLily, message: message),
         ],
@@ -371,9 +370,9 @@ class _MapIntroStep extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   'Each flower on the map is a day in the shop. Finish one and '
-                  'the next opens up.\n\nEvery level scores ⭐ 1–3 stars — earn '
-                  'more on a day to earn more stars, and replay any day to beat '
-                  'your best.',
+                  'the next opens up.\n\nEarn the first star to move on. '
+                  'Quick, well-matched bouquets earn more coins and stars. '
+                  'You can replay a level to beat your best.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.nunito(
                     fontSize: 12.5,
@@ -447,14 +446,14 @@ class _MapTrail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 26,
-        height: 3,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF48FB1).withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(2),
-        ),
-      );
+    width: 26,
+    height: 3,
+    margin: const EdgeInsets.symmetric(horizontal: 4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF48FB1).withValues(alpha: 0.5),
+      borderRadius: BorderRadius.circular(2),
+    ),
+  );
 }
 
 // ── Meet-the-customer step ────────────────────────────────────────────────────
@@ -590,19 +589,37 @@ class _BuildStep extends StatelessWidget {
                         ),
                       ),
                     )
-                  : SingleChildScrollView(
-                      child: Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          for (var i = 0; i < bouquet.length; i++)
-                            GestureDetector(
-                              onTap: () => onRemove(i),
-                              child: _FlowerChip(flower: bouquet[i], inBouquet: true),
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final previewSize = math
+                            .min(
+                              constraints.maxWidth * 0.72,
+                              constraints.maxHeight - 56,
+                            )
+                            .clamp(90.0, 190.0);
+                        return Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            BouquetPreview(flowers: bouquet, size: previewSize),
+                            SizedBox(
+                              height: 52,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: bouquet.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (context, i) => GestureDetector(
+                                  onTap: () => onRemove(i),
+                                  child: _FlowerChip(
+                                    flower: bouquet[i],
+                                    inBouquet: true,
+                                  ),
+                                ),
+                              ),
                             ),
-                        ],
-                      ),
+                          ],
+                        );
+                      },
                     ),
             ),
           ),
@@ -739,7 +756,7 @@ class _CustomerCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(portrait, style: TextStyle(fontSize: compact ? 26 : 32)),
+              CustomerAvatar(name: name, size: compact ? 40 : 48),
               const SizedBox(width: 10),
               Text(
                 name,
@@ -881,8 +898,10 @@ class _FloatWrapState extends State<_FloatWrap>
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
-    _y = Tween<double>(begin: -10, end: 10)
-        .animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut));
+    _y = Tween<double>(
+      begin: -10,
+      end: 10,
+    ).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut));
   }
 
   @override
@@ -893,11 +912,11 @@ class _FloatWrapState extends State<_FloatWrap>
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _y,
-        builder: (_, child) =>
-            Transform.translate(offset: Offset(0, _y.value), child: child),
-        child: widget.child,
-      );
+    animation: _y,
+    builder: (_, child) =>
+        Transform.translate(offset: Offset(0, _y.value), child: child),
+    child: widget.child,
+  );
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -956,14 +975,19 @@ class _CharacterCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final circleColor = isLily ? AppColors.gardenGreenMid : AppColors.shelfWoodMid;
+    final circleColor = isLily
+        ? AppColors.gardenGreenMid
+        : AppColors.shelfWoodMid;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: circleColor.withValues(alpha: 0.12),
-        border: Border.all(color: circleColor.withValues(alpha: 0.25), width: 3),
+        border: Border.all(
+          color: circleColor.withValues(alpha: 0.25),
+          width: 3,
+        ),
         boxShadow: [
           BoxShadow(
             color: circleColor.withValues(alpha: 0.20),
@@ -998,8 +1022,9 @@ class _NameBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: (isLily ? AppColors.gardenGreenDark : AppColors.shelfWoodDark)
-                .withValues(alpha: 0.3),
+            color:
+                (isLily ? AppColors.gardenGreenDark : AppColors.shelfWoodDark)
+                    .withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -1070,16 +1095,17 @@ class _TutFooter extends StatelessWidget {
                   colors: !enabled
                       ? [const Color(0xFFBFC7C0), const Color(0xFFAAB2AB)]
                       : highlight
-                          ? [const Color(0xFFFF6B9E), const Color(0xFFE8456A)]
-                          : [AppColors.gardenGreenMid, AppColors.gardenGreenDark],
+                      ? [const Color(0xFFFF6B9E), const Color(0xFFE8456A)]
+                      : [AppColors.gardenGreenMid, AppColors.gardenGreenDark],
                 ),
                 boxShadow: enabled
                     ? [
                         BoxShadow(
-                          color: (highlight
-                                  ? AppColors.roseRed
-                                  : AppColors.gardenGreenMid)
-                              .withValues(alpha: 0.40),
+                          color:
+                              (highlight
+                                      ? AppColors.roseRed
+                                      : AppColors.gardenGreenMid)
+                                  .withValues(alpha: 0.40),
                           blurRadius: 18,
                           offset: const Offset(0, 6),
                         ),
@@ -1135,8 +1161,10 @@ class _FloatingDecorationsState extends State<_FloatingDecorations>
       vsync: this,
       duration: const Duration(milliseconds: 2600),
     )..repeat(reverse: true);
-    _y = Tween<double>(begin: 0, end: 8)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    _y = Tween<double>(
+      begin: 0,
+      end: 8,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -1149,19 +1177,23 @@ class _FloatingDecorationsState extends State<_FloatingDecorations>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _y,
-      builder: (_, __) => Stack(
+      builder: (_, _) => Stack(
         children: [
           Positioned(
             top: 50 + _y.value * 0.5,
             left: 16,
-            child: const Text('🌸', style: TextStyle(fontSize: 30)),
+            child: FlowerImage(flower: flowerById['rose']!, size: 34),
           ),
           Positioned(
             top: 110 - _y.value,
             right: 24,
             child: Opacity(
               opacity: 0.6,
-              child: const Text('✨', style: TextStyle(fontSize: 22)),
+              child: const Icon(
+                Icons.auto_awesome_rounded,
+                color: AppColors.sunflowerGold,
+                size: 24,
+              ),
             ),
           ),
           Positioned(
@@ -1169,7 +1201,7 @@ class _FloatingDecorationsState extends State<_FloatingDecorations>
             left: 20,
             child: Opacity(
               opacity: 0.45,
-              child: const Text('🌼', style: TextStyle(fontSize: 18)),
+              child: FlowerImage(flower: flowerById['daisy']!, size: 25),
             ),
           ),
           Positioned(
@@ -1177,7 +1209,7 @@ class _FloatingDecorationsState extends State<_FloatingDecorations>
             right: 70,
             child: Opacity(
               opacity: 0.4,
-              child: const Text('🌿', style: TextStyle(fontSize: 18)),
+              child: FlowerImage(flower: flowerById['eucalyptus']!, size: 25),
             ),
           ),
         ],

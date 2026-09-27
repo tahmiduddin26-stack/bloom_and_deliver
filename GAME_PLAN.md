@@ -1,5 +1,8 @@
 # Bloom & Deliver — Full Game Plan (Opening → Level 20)
 
+> Historical design draft. See [CURRENT_GAME_PLAN.md](CURRENT_GAME_PLAN.md) for
+> the playable rules, current art direction, and remaining release work.
+
 A cozy, girly flower-shop game. You run a little florist's, matching bouquets to customer vibes, earning coins, and spending them back into the shop — restocking flowers, buying upgrades, and decorating. No fail states, no timers: finishing a level always earns at least 1 star, and better earnings earn 2–3 stars. Any unlocked level can be replayed for more stars.
 
 This plan reflects what is now implemented in code, informed by cozy-game design research (safety, abundance, softness — see [Lostgarden's cozy games essay](https://lostgarden.com/2018/01/24/cozy-games/)) and Candy Crush-style saga map conventions (linear node path, 1–3 stars, visible progress — see [level design breakdowns](https://cjleo.com/blog/1001-levels-of-candy-crush/)).

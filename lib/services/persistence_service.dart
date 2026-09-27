@@ -8,6 +8,7 @@ import '../data/delivery_data.dart';
 import '../data/flower_data.dart';
 import '../data/order_data.dart';
 import '../models/big_order.dart';
+import '../models/bouquet_order.dart';
 import '../models/bouquet_preset.dart';
 import '../models/daily_challenge.dart';
 import '../models/delivery_mission.dart';
@@ -46,13 +47,13 @@ const _kLastLoginMs = 'game_last_login_ms';
 
 // Tier 4 additions
 const _kVibeDiscoveries = 'game_vibe_discoveries';
-const _kActiveBigOrder  = 'game_active_big_order';
+const _kActiveBigOrder = 'game_active_big_order';
 const _kWholesalePending = 'game_wholesale_pending';
 
 // Tier 5 additions
-const _kPurchasedDecor  = 'game_purchased_decor';
-const _kActiveDecor     = 'game_active_decor';
-const _kPresets         = 'game_bouquet_presets';
+const _kPurchasedDecor = 'game_purchased_decor';
+const _kActiveDecor = 'game_active_decor';
+const _kPresets = 'game_bouquet_presets';
 const _kBestDayEarnings = 'game_best_day_earnings';
 const _kAllTimeFlowerUse = 'game_all_time_flower_use';
 
@@ -62,90 +63,129 @@ const _kLevelStars = 'game_level_stars';
 // ── Service ──────────────────────────────────────────────────────────────────
 
 class PersistenceService {
-  static Future<void> saveState(GameState state) async {
-    final prefs = await SharedPreferences.getInstance();
+  static Future<void> _pendingSave = Future.value();
+
+  static Future<void> saveState(GameState state) {
+    _pendingSave = _pendingSave.then((_) => _writeState(state)).catchError((
+      Object error,
+    ) {
+      debugPrint('Could not save game: $error');
+    });
+    return _pendingSave;
+  }
+
+  static Future<void> _writeState(GameState state) async {
+    final prefs = _SaveValues({});
 
     await prefs.setInt(_kDay, state.day);
     await prefs.setInt(_kMoney, state.money);
     await prefs.setInt(_kGems, state.gems);
     await prefs.setString(_kInventory, jsonEncode(state.inventory));
     await prefs.setString(
-        _kInventoryDayAdded, jsonEncode(state.inventoryDayAdded));
+      _kInventoryDayAdded,
+      jsonEncode(state.inventoryDayAdded),
+    );
 
     // Tier 1
     await prefs.setInt(_kXp, state.xp);
+    await prefs.setString(_kUpgrades, jsonEncode(state.upgrades.toJson()));
     await prefs.setString(
-        _kUpgrades, jsonEncode(state.upgrades.toJson()));
-    await prefs.setString(
-        _kAchievements, jsonEncode(state.unlockedAchievements.toList()));
+      _kAchievements,
+      jsonEncode(state.unlockedAchievements.toList()),
+    );
     await prefs.setInt(_kTotalServed, state.totalOrdersServed);
     await prefs.setInt(_kTotalEarnings, state.totalEarnings);
     await prefs.setInt(_kGreatStreak, state.greatStreak);
     await prefs.setString(
-        _kServedVibes, jsonEncode(state.servedVibeIds.toList()));
+      _kServedVibes,
+      jsonEncode(state.servedVibeIds.toList()),
+    );
     await prefs.setInt(_kChallengeDay, state.challengeGameDay);
     await prefs.setString(
-        _kChallenges,
-        jsonEncode(state.dailyChallenges.map((c) => c.toJson()).toList()));
+      _kChallenges,
+      jsonEncode(state.dailyChallenges.map((c) => c.toJson()).toList()),
+    );
 
     // Tier 2
-    await prefs.setString(
-        _kFriendship,
-        jsonEncode(state.customerFriendship));
+    await prefs.setString(_kFriendship, jsonEncode(state.customerFriendship));
     await prefs.setInt(_kReputation, state.reputationScore);
 
     // Tier 3
     await prefs.setString(
-        _kWindowsill,
-        jsonEncode(state.windowsillPlots.map((p) => p.toJson()).toList()));
+      _kWindowsill,
+      jsonEncode(state.windowsillPlots.map((p) => p.toJson()).toList()),
+    );
     await prefs.setString(
-        _kDeliveries,
-        jsonEncode(state.pendingDeliveries.map((d) => d.toJson()).toList()));
+      _kDeliveries,
+      jsonEncode(state.pendingDeliveries.map((d) => d.toJson()).toList()),
+    );
     await prefs.setInt(_kLoginStreak, state.loginStreak);
     await prefs.setInt(_kLastLoginMs, state.lastLoginDateMs);
 
     // Tier 4
     await prefs.setString(
-        _kVibeDiscoveries,
-        jsonEncode(state.vibeDiscoveries.toList()));
+      _kVibeDiscoveries,
+      jsonEncode(state.vibeDiscoveries.toList()),
+    );
     if (state.activeBigOrder != null) {
       await prefs.setString(
-          _kActiveBigOrder,
-          jsonEncode(state.activeBigOrder!.toJson()));
+        _kActiveBigOrder,
+        jsonEncode(state.activeBigOrder!.toJson()),
+      );
     } else {
       await prefs.remove(_kActiveBigOrder);
     }
     await prefs.setString(
-        _kWholesalePending,
-        jsonEncode(state.wholesalePending));
+      _kWholesalePending,
+      jsonEncode(state.wholesalePending),
+    );
 
     // Tier 5
     await prefs.setString(
-        _kPurchasedDecor,
-        jsonEncode(state.purchasedDecor.toList()));
+      _kPurchasedDecor,
+      jsonEncode(state.purchasedDecor.toList()),
+    );
+    await prefs.setString(_kActiveDecor, jsonEncode(state.activeDecor));
     await prefs.setString(
-        _kActiveDecor,
-        jsonEncode(state.activeDecor));
-    await prefs.setString(
-        _kPresets,
-        jsonEncode(state.bouquetPresets.map((p) => p.toJson()).toList()));
+      _kPresets,
+      jsonEncode(state.bouquetPresets.map((p) => p.toJson()).toList()),
+    );
     await prefs.setInt(_kBestDayEarnings, state.bestDayEarnings);
     await prefs.setString(
-        _kAllTimeFlowerUse,
-        jsonEncode(state.allTimeFlowerUse));
+      _kAllTimeFlowerUse,
+      jsonEncode(state.allTimeFlowerUse),
+    );
 
     // Level campaign
     await prefs.setString(
-        _kLevelStars,
-        jsonEncode(
-            state.levelStars.map((k, v) => MapEntry(k.toString(), v))));
+      _kLevelStars,
+      jsonEncode(state.levelStars.map((k, v) => MapEntry(k.toString(), v))),
+    );
+    prefs.values['session'] = {
+      'orders': state.dayOrders.map((o) => o.id).toList(),
+      'completed': state.completedToday
+          .map((e) => {'result': e.$1.result.name, 'earned': e.$2})
+          .toList(),
+      'workspace': state.bouquetWorkspace.map((f) => f.id).toList(),
+      'restock': state.restockSpentToday,
+    };
+    // One atomic preference prevents partially updated wallets and progress.
+    final storage = await SharedPreferences.getInstance();
+    await storage.setString('game_snapshot_v2', jsonEncode(prefs.values));
   }
 
   static Future<GameState?> loadState() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!prefs.containsKey(_kDay)) return null;
+    await _pendingSave;
+    final storage = await SharedPreferences.getInstance();
 
     try {
+      final snapshot = storage.getString('game_snapshot_v2');
+      final prefs = _SaveValues(
+        snapshot == null
+            ? {for (final key in storage.getKeys()) key: storage.get(key)}
+            : Map<String, dynamic>.from(jsonDecode(snapshot) as Map),
+      );
+      if (!prefs.containsKey(_kDay)) return null;
       final day = prefs.getInt(_kDay)!;
       final money = prefs.getInt(_kMoney)!;
       // Older saves predate gems — default to 0 rather than failing the load.
@@ -211,8 +251,8 @@ class PersistenceService {
       final rawWindowsill = prefs.getString(_kWindowsill);
       final windowsillPlots = rawWindowsill != null
           ? (jsonDecode(rawWindowsill) as List)
-              .map((e) => GrowingPlant.fromJson(e as Map<String, dynamic>))
-              .toList()
+                .map((e) => GrowingPlant.fromJson(e as Map<String, dynamic>))
+                .toList()
           : <GrowingPlant>[];
 
       final rawDeliveries = prefs.getString(_kDeliveries);
@@ -277,7 +317,9 @@ class PersistenceService {
       // Tier 5
       final rawPurchasedDecor = prefs.getString(_kPurchasedDecor);
       final purchasedDecor = rawPurchasedDecor != null
-          ? Set<String>.from((jsonDecode(rawPurchasedDecor) as List).cast<String>())
+          ? Set<String>.from(
+              (jsonDecode(rawPurchasedDecor) as List).cast<String>(),
+            )
           : <String>{};
 
       final rawActiveDecor = prefs.getString(_kActiveDecor);
@@ -292,8 +334,8 @@ class PersistenceService {
       final rawPresets = prefs.getString(_kPresets);
       final bouquetPresets = rawPresets != null
           ? (jsonDecode(rawPresets) as List)
-              .map((e) => BouquetPreset.fromJson(e as Map<String, dynamic>))
-              .toList()
+                .map((e) => BouquetPreset.fromJson(e as Map<String, dynamic>))
+                .toList()
           : <BouquetPreset>[];
 
       final bestDayEarnings = prefs.getInt(_kBestDayEarnings) ?? 0;
@@ -322,20 +364,40 @@ class PersistenceService {
         levelStars = {for (var i = 1; i < day; i++) i: 1};
       }
 
+      final session = prefs.values['session'] as Map?;
+      final templates = {
+        for (final order in [...orderPool, ...mysteryOrderPool])
+          order.id: order,
+      };
+      final orders = session == null
+          ? generateDayOrders(day, extraOrders: upgrades.extraCustomersPerDay)
+          : (session['orders'] as List).map((id) => templates[id]!).toList();
+      final completed = <(BouquetOrder, int)>[];
+      if (session != null) {
+        for (final entry in session['completed'] as List) {
+          final index = completed.length;
+          orders[index] = orders[index].copyWith(
+            result: OrderResult.values.byName(entry['result'] as String),
+          );
+          completed.add((orders[index], entry['earned'] as int));
+        }
+      }
       return GameState(
         day: day,
         money: money,
         gems: gems,
         inventory: inventory,
         inventoryDayAdded: inventoryDayAdded,
-        restockSpentToday: 0,
-        dayOrders: generateDayOrders(
-          day,
-          extraOrders: upgrades.extraCustomersPerDay,
-        ),
-        currentOrderIndex: 0,
-        bouquetWorkspace: [],
-        completedToday: [],
+        restockSpentToday: session?['restock'] as int? ?? 0,
+        dayOrders: orders,
+        currentOrderIndex: completed.length,
+        bouquetWorkspace: session == null
+            ? []
+            : (session['workspace'] as List)
+                  .map((id) => flowerById[id]!)
+                  .toList(),
+        completedToday: completed,
+        dayEnded: completed.length == orders.length,
         xp: xp,
         upgrades: upgrades,
         unlockedAchievements: achievements,
@@ -373,20 +435,61 @@ class PersistenceService {
   }
 
   static Future<void> clearSave() async {
+    await _pendingSave;
     final prefs = await SharedPreferences.getInstance();
     for (final key in [
-      _kDay, _kMoney, _kInventory, _kInventoryDayAdded,
-      _kXp, _kUpgrades, _kAchievements, _kTotalServed,
-      _kTotalEarnings, _kGreatStreak, _kServedVibes,
-      _kChallengeDay, _kChallenges,
-      _kFriendship, _kReputation,
-      _kWindowsill, _kDeliveries, _kLoginStreak, _kLastLoginMs,
-      _kVibeDiscoveries, _kActiveBigOrder, _kWholesalePending,
-      _kPurchasedDecor, _kActiveDecor, _kPresets,
-      _kBestDayEarnings, _kAllTimeFlowerUse,
+      'game_snapshot_v2',
+      _kGems,
+      _kDay,
+      _kMoney,
+      _kInventory,
+      _kInventoryDayAdded,
+      _kXp,
+      _kUpgrades,
+      _kAchievements,
+      _kTotalServed,
+      _kTotalEarnings,
+      _kGreatStreak,
+      _kServedVibes,
+      _kChallengeDay,
+      _kChallenges,
+      _kFriendship,
+      _kReputation,
+      _kWindowsill,
+      _kDeliveries,
+      _kLoginStreak,
+      _kLastLoginMs,
+      _kVibeDiscoveries,
+      _kActiveBigOrder,
+      _kWholesalePending,
+      _kPurchasedDecor,
+      _kActiveDecor,
+      _kPresets,
+      _kBestDayEarnings,
+      _kAllTimeFlowerUse,
       _kLevelStars,
     ]) {
       await prefs.remove(key);
     }
+  }
+}
+
+/// Legacy preference names remain readable during snapshot migration.
+class _SaveValues {
+  final Map<String, dynamic> values;
+  _SaveValues(this.values);
+  bool containsKey(String key) => values.containsKey(key);
+  int? getInt(String key) => values[key] as int?;
+  String? getString(String key) => values[key] as String?;
+  Future<void> setInt(String key, int value) async {
+    values[key] = value;
+  }
+
+  Future<void> setString(String key, String value) async {
+    values[key] = value;
+  }
+
+  Future<void> remove(String key) async {
+    values.remove(key);
   }
 }

@@ -396,7 +396,7 @@ class _ScoreBarState extends State<_ScoreBar>
                 // Fill
                 AnimatedBuilder(
                   animation: _barAnim,
-                  builder: (_, __) => Container(
+                  builder: (_, _) => Container(
                     height: 10,
                     width: constraints.maxWidth *
                         widget.fraction *

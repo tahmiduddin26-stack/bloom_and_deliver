@@ -1,12 +1,21 @@
 /// 20-level campaign definitions.
 ///
 /// Each level corresponds 1:1 to an in-game day (level N plays day N).
-/// Completing a level (serving all its orders) always awards at least 1 star —
-/// the game stays cozy, there is no fail state. Higher day earnings award
-/// 2 or 3 stars, and any unlocked level can be replayed for a better score.
+/// Complete the orders and meet the first coin goal to unlock the next stage.
+/// Missed goals can be retried without a lives or energy cost.
 library;
 
+import 'order_data.dart';
+
 class LevelDef {
+  /// Service target tightens across the campaign; festival stages push harder.
+  bool get isRush => number >= 5 && number % 5 == 0;
+  int get serviceSeconds => (55 - number * 2 - (isRush ? 5 : 0)).clamp(16, 55);
+  String get paceLabel => isRush
+      ? 'Festival rush'
+      : number < 4
+      ? 'Warm up'
+      : 'Quick service';
   final int number;
   final String title;
   final String subtitle;
@@ -15,6 +24,7 @@ class LevelDef {
   /// Earnings needed for 2 and 3 stars (1 star = just finish the day).
   final int star2Earnings;
   final int star3Earnings;
+  int get star1Earnings => (star2Earnings * 0.7).round();
 
   /// Short description of what this level introduces or unlocks.
   final String unlockText;
@@ -33,20 +43,21 @@ class LevelDef {
   int starsFor(int earnings) {
     if (earnings >= star3Earnings) return 3;
     if (earnings >= star2Earnings) return 2;
-    return 1;
+    if (earnings >= star1Earnings) return 1;
+    return 0;
   }
 }
 
 /// The 20 campaign levels. Order counts and payouts follow
 /// `generateDayOrders`: 3 orders on day 1 growing to 8 by day 6, 10 from day 15.
-const List<LevelDef> allLevels = [
+const List<LevelDef> _levelThemes = [
   LevelDef(
     number: 1,
     title: 'Grand Opening',
     subtitle: 'Your first customers arrive',
     emoji: '🎀',
     star2Earnings: 100,
-    star3Earnings: 120,
+    star3Earnings: 160,
     unlockText: 'Learn the basics: drag, match vibes, submit!',
   ),
   LevelDef(
@@ -55,7 +66,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'A few more faces at the door',
     emoji: '🌷',
     star2Earnings: 135,
-    star3Earnings: 160,
+    star3Earnings: 210,
     unlockText: 'Restock at the market between days.',
   ),
   LevelDef(
@@ -64,7 +75,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'New flowers hit the market',
     emoji: '🌸',
     star2Earnings: 215,
-    star3Earnings: 255,
+    star3Earnings: 335,
     unlockText: 'Unlocks Tier 2 flowers: Orchid, Gerbera, Snapdragon…',
   ),
   LevelDef(
@@ -73,7 +84,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'A strange request appears',
     emoji: '🎭',
     star2Earnings: 260,
-    star3Earnings: 310,
+    star3Earnings: 405,
     unlockText: 'First mystery order — creativity pays!',
   ),
   LevelDef(
@@ -82,7 +93,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'Loyal customers remember you',
     emoji: '💕',
     star2Earnings: 300,
-    star3Earnings: 360,
+    star3Earnings: 470,
     unlockText: 'Friendship hearts grow with every good bouquet.',
   ),
   LevelDef(
@@ -91,7 +102,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'Eight orders, one florist',
     emoji: '☀️',
     star2Earnings: 345,
-    star3Earnings: 410,
+    star3Earnings: 535,
     unlockText: 'Unlocks Tier 3 flowers: Peony, Ranunculus, Wisteria…',
   ),
   LevelDef(
@@ -100,7 +111,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'A touch of eucalyptus goes far',
     emoji: '🌿',
     star2Earnings: 345,
-    star3Earnings: 410,
+    star3Earnings: 535,
     unlockText: 'Filler greens add a bonus to every bouquet.',
   ),
   LevelDef(
@@ -109,7 +120,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'Petal & Co. opens across the street',
     emoji: '🏪',
     star2Earnings: 440,
-    star3Earnings: 530,
+    star3Earnings: 690,
     unlockText: 'Late-tier orders begin — bigger, fancier requests.',
   ),
   LevelDef(
@@ -118,7 +129,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'The shop hits its stride',
     emoji: '🌼',
     star2Earnings: 440,
-    star3Earnings: 530,
+    star3Earnings: 690,
     unlockText: 'Loyal regulars tip more — keep their bouquets beautiful.',
   ),
   LevelDef(
@@ -127,7 +138,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'The exotic protea arrives',
     emoji: '👑',
     star2Earnings: 440,
-    star3Earnings: 530,
+    star3Earnings: 690,
     unlockText: 'Unlocks the Protea — the rarest bloom in the shop.',
   ),
   LevelDef(
@@ -136,7 +147,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'The requests grow fancier',
     emoji: '💐',
     star2Earnings: 440,
-    star3Earnings: 530,
+    star3Earnings: 690,
     unlockText: 'Bigger orders ask for more vibes — read every hint closely.',
   ),
   LevelDef(
@@ -145,7 +156,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'The masked patron returns',
     emoji: '🎭',
     star2Earnings: 440,
-    star3Earnings: 530,
+    star3Earnings: 690,
     unlockText: 'Mystery orders now visit more often.',
   ),
   LevelDef(
@@ -154,7 +165,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'Deck out your space',
     emoji: '🎨',
     star2Earnings: 440,
-    star3Earnings: 530,
+    star3Earnings: 690,
     unlockText: 'Spend coins on wallpaper, lights, and decor.',
   ),
   LevelDef(
@@ -163,8 +174,9 @@ const List<LevelDef> allLevels = [
     subtitle: 'Love is in the air',
     emoji: '💝',
     star2Earnings: 440,
-    star3Earnings: 530,
-    unlockText: "Valentine's Week begins — a special bloom appears in the market.",
+    star3Earnings: 690,
+    unlockText:
+        "Valentine's Week begins — a special bloom appears in the market.",
   ),
   LevelDef(
     number: 15,
@@ -172,7 +184,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'Ten orders a day now!',
     emoji: '💐',
     star2Earnings: 620,
-    star3Earnings: 740,
+    star3Earnings: 965,
     unlockText: 'Premium landmark orders unlock — the fanciest requests.',
   ),
   LevelDef(
@@ -181,7 +193,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'Your busiest days yet',
     emoji: '🌟',
     star2Earnings: 620,
-    star3Earnings: 740,
+    star3Earnings: 965,
     unlockText: 'Keep your stock deep and aim for Great on every order.',
   ),
   LevelDef(
@@ -190,7 +202,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'The town prepares to celebrate',
     emoji: '🏮',
     star2Earnings: 620,
-    star3Earnings: 740,
+    star3Earnings: 965,
     unlockText: 'Seasonal events bring exclusive flowers.',
   ),
   LevelDef(
@@ -199,7 +211,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'Only your best work will do',
     emoji: '✨',
     star2Earnings: 620,
-    star3Earnings: 740,
+    star3Earnings: 965,
     unlockText: 'Aim for Great on every order.',
   ),
   LevelDef(
@@ -208,7 +220,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'Petal & Co. makes its move',
     emoji: '⚔️',
     star2Earnings: 620,
-    star3Earnings: 740,
+    star3Earnings: 965,
     unlockText: 'Show the town who the real florist is.',
   ),
   LevelDef(
@@ -217,7 +229,7 @@ const List<LevelDef> allLevels = [
     subtitle: 'The best flower shop in town',
     emoji: '🏆',
     star2Earnings: 620,
-    star3Earnings: 740,
+    star3Earnings: 965,
     unlockText: 'Finish the campaign — endless mode awaits!',
   ),
 ];
@@ -225,17 +237,51 @@ const List<LevelDef> allLevels = [
 /// Total number of campaign levels.
 const int maxCampaignLevel = 20;
 
+/// Goals follow the actual deterministic orders, including mystery payouts.
+/// This avoids impossible three-star goals on low-paying random selections.
+LevelDef _balancedLevel(LevelDef theme) {
+  final orders = generateDayOrders(theme.number);
+  final greatBase = orders.fold<double>(
+    0,
+    (total, order) =>
+        total +
+        order.basePayment *
+            (order.isMystery ? 2.5 : 1.3 * order.customer.loyaltyMultiplier),
+  );
+  return LevelDef(
+    number: theme.number,
+    title: theme.title,
+    subtitle: theme.subtitle,
+    emoji: theme.emoji,
+    star2Earnings: (greatBase * 0.8).round(),
+    star3Earnings:
+        (greatBase *
+                (theme.number < 4
+                    ? 1.0
+                    : (1.18 + theme.number * 0.008).clamp(1.18, 1.34)))
+            .round(),
+    unlockText:
+        '${theme.unlockText}\n${theme.paceLabel}: ${theme.serviceSeconds}s for a quick-service tip. Chain Great bouquets for more coins.',
+  );
+}
+
+final List<LevelDef> allLevels = List.unmodifiable(
+  _levelThemes.map(_balancedLevel),
+);
+
 /// Look up a level definition (1-based). Days beyond 20 return an
 /// auto-generated endless-mode definition.
 LevelDef levelForDay(int day) {
   if (day >= 1 && day <= allLevels.length) return allLevels[day - 1];
-  return LevelDef(
-    number: day,
-    title: 'Endless Bloom $day',
-    subtitle: 'Free play — day $day',
-    emoji: '🌼',
-    star2Earnings: 620 + (day - 20) * 12,
-    star3Earnings: 740 + (day - 20) * 16,
-    unlockText: 'Keep the shop blooming!',
+  return _balancedLevel(
+    LevelDef(
+      number: day,
+      title: 'Endless Bloom $day',
+      subtitle: 'Free play — day $day',
+      emoji: '🌼',
+      star2Earnings: 620 + (day - 20) * 12,
+      star3Earnings: 740 + (day - 20) * 16,
+      unlockText: 'Keep the shop blooming!',
+    ),
   );
 }

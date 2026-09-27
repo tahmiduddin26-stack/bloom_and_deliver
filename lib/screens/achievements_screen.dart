@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-
-import '../config/feature_flags.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../config/feature_flags.dart';
 import '../data/achievements_data.dart';
 import '../models/achievement.dart';
 import '../providers/game_provider.dart';
@@ -34,11 +33,7 @@ class _AchievementsSheet extends ConsumerWidget {
       minChildSize: 0.4,
       builder: (context, scrollController) => Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF28283C), Color(0xFF1A1A2C)],
-          ),
+          color: AppColors.cream,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
@@ -49,7 +44,7 @@ class _AchievementsSheet extends ConsumerWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.25),
+                color: AppColors.brownLight,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -60,27 +55,36 @@ class _AchievementsSheet extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  const Text('🏆', style: TextStyle(fontSize: 22)),
+                  const Icon(
+                    Icons.emoji_events_rounded,
+                    color: AppColors.gardenGreenDark,
+                    size: 27,
+                  ),
                   const SizedBox(width: 10),
-                  Text(
-                    'Achievements',
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.warmWhite,
+                  Expanded(
+                    child: Text(
+                      'Achievements',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.nunito(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.gardenGreenDark,
+                      ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.sunflowerGold.withValues(alpha: 0.20),
+                      color: const Color(0xFFFFE6A8),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.sunflowerGold.withValues(alpha: 0.4),
+                        color: AppColors.cartoonInk,
+                        width: 1.5,
                       ),
                     ),
                     child: Text(
@@ -88,7 +92,7 @@ class _AchievementsSheet extends ConsumerWidget {
                       style: GoogleFonts.nunito(
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.sunflowerGold,
+                        color: AppColors.gardenGreenDark,
                       ),
                     ),
                   ),
@@ -102,12 +106,11 @@ class _AchievementsSheet extends ConsumerWidget {
               child: GridView.builder(
                 controller: scrollController,
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
-                  childAspectRatio: 1.45,
+                  mainAxisExtent: 148,
                 ),
                 itemCount: allAchievements.length,
                 itemBuilder: (context, i) {
@@ -133,10 +136,7 @@ class _AchievementTile extends StatelessWidget {
   final Achievement achievement;
   final bool unlocked;
 
-  const _AchievementTile({
-    required this.achievement,
-    required this.unlocked,
-  });
+  const _AchievementTile({required this.achievement, required this.unlocked});
 
   @override
   Widget build(BuildContext context) {
@@ -144,24 +144,9 @@ class _AchievementTile extends StatelessWidget {
       duration: const Duration(milliseconds: 350),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: unlocked
-            ? LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFFFFD700).withValues(alpha: 0.22),
-                  const Color(0xFFFFAA00).withValues(alpha: 0.08),
-                ],
-              )
-            : null,
-        color: unlocked ? null : Colors.white.withValues(alpha: 0.05),
+        color: unlocked ? const Color(0xFFFFE6A8) : AppColors.warmWhite,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: unlocked
-              ? const Color(0xFFFFD700).withValues(alpha: 0.5)
-              : Colors.white.withValues(alpha: 0.08),
-          width: 1.5,
-        ),
+        border: Border.all(color: AppColors.cartoonInk, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,7 +154,7 @@ class _AchievementTile extends StatelessWidget {
           Row(
             children: [
               AnimatedOpacity(
-                opacity: unlocked ? 1.0 : 0.25,
+                opacity: unlocked ? 1.0 : 0.5,
                 duration: const Duration(milliseconds: 300),
                 child: Text(
                   achievement.emoji,
@@ -181,7 +166,7 @@ class _AchievementTile extends StatelessWidget {
                 const Text(
                   '✓',
                   style: TextStyle(
-                    color: Color(0xFFFFD700),
+                    color: AppColors.gardenGreenDark,
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                   ),
@@ -194,9 +179,7 @@ class _AchievementTile extends StatelessWidget {
             style: GoogleFonts.nunito(
               fontSize: 12,
               fontWeight: FontWeight.w900,
-              color: unlocked
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.28),
+              color: unlocked ? AppColors.gardenGreenDark : AppColors.brownDark,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -208,8 +191,7 @@ class _AchievementTile extends StatelessWidget {
               style: GoogleFonts.nunito(
                 fontSize: 9.5,
                 fontWeight: FontWeight.w600,
-                color: Colors.white
-                    .withValues(alpha: unlocked ? 0.60 : 0.22),
+                color: AppColors.brownDark,
                 height: 1.3,
               ),
               maxLines: 3,

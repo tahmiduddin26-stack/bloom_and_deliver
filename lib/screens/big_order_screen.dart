@@ -1,22 +1,20 @@
 import 'package:flutter/material.dart';
-
-import '../config/feature_flags.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../config/feature_flags.dart';
 import '../data/flower_data.dart';
 import '../models/big_order.dart';
 import '../models/flower.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/bouquet_preview.dart';
 import '../widgets/flower_image.dart';
 
-/// Full-screen workspace for submitting one day's contribution to a big order.
+/// One optional end-of-day bouquet for a three-day commission.
 class BigOrderScreen extends ConsumerStatefulWidget {
-  /// Called after the bouquet is submitted or the user cancels.
   final VoidCallback onDone;
-
   const BigOrderScreen({super.key, required this.onDone});
 
   @override
@@ -24,526 +22,371 @@ class BigOrderScreen extends ConsumerStatefulWidget {
 }
 
 class _BigOrderScreenState extends ConsumerState<BigOrderScreen> {
-  /// Result shown after submission — null while still building.
-  ContributionResult? _submittedResult;
+  final List<Flower> _bouquet = [];
+  ContributionResult? _result;
+  int _earned = 0;
+  bool _leaving = false;
 
-  /// Uses the shared provider workspace so inventory deductions are consistent.
-  void _addFlower(String flowerId) {
-    final state = ref.read(gameProvider);
-    final order = state.activeBigOrder;
-    if (order == null) return;
-    final wsLen = state.bouquetWorkspace.length;
-    if (wsLen >= order.maxFlowers) return;
-    ref.read(gameProvider.notifier).addFlowerToWorkspace(flowerId);
-  }
-
-  void _removeFlower(int idx) {
-    ref.read(gameProvider.notifier).removeFlowerFromWorkspace(idx);
+  void _leave() {
+    if (_leaving) return;
+    _leaving = true;
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) => widget.onDone());
   }
 
   void _submit() {
-    final workspace = ref.read(gameProvider).bouquetWorkspace;
-    if (workspace.isEmpty) return;
-    // contributeBigOrder scores the bouquet AND clears the workspace internally
-    final result =
-        ref.read(gameProvider.notifier).contributeBigOrder(workspace);
-    if (result != null) {
-      AudioService.instance.play(switch (result) {
-        ContributionResult.great => GameSound.greatOrder,
-        ContributionResult.poor => GameSound.poorOrder,
-        _ => GameSound.coin,
-      });
-      setState(() => _submittedResult = result);
+    final before = ref.read(gameProvider).money;
+    final result = ref.read(gameProvider.notifier).contributeBigOrder(_bouquet);
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Check your flower stock and try again.')),
+      );
+      return;
     }
+    AudioService.instance.play(switch (result) {
+      ContributionResult.great => GameSound.greatOrder,
+      ContributionResult.poor => GameSound.poorOrder,
+      _ => GameSound.coin,
+    });
+    setState(() {
+      _result = result;
+      _earned = ref.read(gameProvider).money - before;
+      _bouquet.clear();
+    });
   }
 
-  @override
-  void dispose() {
-    // If the user leaves without submitting, return workspace flowers
-    if (_submittedResult == null) {
-      ref.read(gameProvider.notifier).clearWorkspace();
+  void _add(Flower flower, int stock, int max) {
+    if (_bouquet.length >= max ||
+        _bouquet.where((item) => item.id == flower.id).length >= stock) {
+      return;
     }
-    super.dispose();
+    setState(() => _bouquet.add(flower));
+    AudioService.instance.play(GameSound.flowerDrop);
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(gameProvider);
     final order = state.activeBigOrder;
-
     if (order == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Commission')),
         body: const Center(child: Text('No active commission.')),
       );
     }
+    final canSubmit =
+        _result == null &&
+        order.canContributeOn(state.day) &&
+        _bouquet.length >= order.minFlowers &&
+        _bouquet.length <= order.maxFlowers;
+    final available = unlockedFlowers(
+      state.day,
+    ).where((flower) => (state.inventory[flower.id] ?? 0) > 0).toList();
+    final storyIndex = _result == null
+        ? order.nextDayIndex ?? 0
+        : (order.daysSubmitted - 1).clamp(0, 2);
 
-    final workspace = state.bouquetWorkspace;
-    final dayIdx = order.nextDayIndex ?? 0;
-    final minFlowers = order.minFlowers;
-    final canSubmit = workspace.length >= minFlowers && _submittedResult == null;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A2C20),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF2A3D2A),
-        foregroundColor: Colors.white,
-        title: Text(
-          '${order.emoji}  ${order.name}',
-          style: GoogleFonts.playfairDisplay(
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop && !_leaving) {
+          _leaving = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) => widget.onDone());
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.cream,
+        appBar: AppBar(
+          backgroundColor: AppColors.gardenGreenDark,
+          foregroundColor: Colors.white,
+          title: Text(
+            'Commission',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w900),
           ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          // clearWorkspace is called in dispose() if not submitted
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: Column(
-        children: [
-          // ── Progress chips ─────────────────────────────────────────────────
-          _CommissionProgress(order: order),
-
-          // ── Story for today ────────────────────────────────────────────────
-          if (_submittedResult == null)
-            _DayStoryCard(story: order.dayStories[dayIdx]),
-
-          // ── Result card ────────────────────────────────────────────────────
-          if (_submittedResult != null)
-            _ResultCard(result: _submittedResult!, onDone: widget.onDone),
-
-          // ── Workspace ──────────────────────────────────────────────────────
-          if (_submittedResult == null) ...[
-            _WorkspaceStrip(
-              flowers: workspace,
-              maxFlowers: order.maxFlowers,
-              onRemove: _removeFlower,
-            ),
-            // ── Flower picker ────────────────────────────────────────────────
-            Expanded(
-              child: _FlowerPicker(
-                inventory: state.inventory,
-                day: state.day,
-                onAdd: _addFlower,
+          actions: [
+            TextButton(
+              onPressed: _leave,
+              child: Text(
+                _result == null ? 'Skip' : 'Done',
+                style: const TextStyle(color: Colors.white),
               ),
-            ),
-            // ── Submit bar ────────────────────────────────────────────────────
-            _SubmitBar(
-              canSubmit: canSubmit,
-              minFlowers: minFlowers,
-              current: workspace.length,
-              onSubmit: _submit,
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-// ── Commission progress bar ────────────────────────────────────────────────────
-
-class _CommissionProgress extends StatelessWidget {
-  final BigOrder order;
-
-  const _CommissionProgress({required this.order});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      color: const Color(0xFF2A3D2A),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(3, (i) {
-          final contrib = order.contributions[i];
-          final isDone = contrib.isSubmitted;
-          final isNext = !isDone && i == order.daysSubmitted;
-          final col = switch (contrib.result) {
-            ContributionResult.great => AppColors.sunflowerGold,
-            ContributionResult.good => AppColors.sageDark,
-            ContributionResult.poor => AppColors.carnationCoral,
-            _ => Colors.white24,
-          };
-          return Row(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
-                width: isNext ? 40 : 32,
-                height: isNext ? 40 : 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isDone ? col : Colors.white12,
-                  border: isNext
-                      ? Border.all(color: Colors.white60, width: 2)
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  isDone ? '✓' : '${i + 1}',
-                  style: GoogleFonts.nunito(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                children: [
+                  _card(
+                    const Color(0xFFFFE2AE),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${order.emoji}  ${order.name}',
+                          style: _heading(21),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(order.description, style: _body()),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Deadline: end of Day ${order.deadlineDay}',
+                          style: _body(bold: true),
+                        ),
+                        Text(
+                          'One bouquet per day • ${order.daysSubmitted}/3 delivered',
+                          style: _body(bold: true),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-              if (i < 2)
-                Container(
-                  width: 28,
-                  height: 2,
-                  color: i < order.daysSubmitted
-                      ? AppColors.sageDark
-                      : Colors.white24,
-                ),
-            ],
-          );
-        }),
-      ),
-    );
-  }
-}
-
-// ── Day story card ─────────────────────────────────────────────────────────────
-
-class _DayStoryCard extends StatelessWidget {
-  final String story;
-
-  const _DayStoryCard({required this.story});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('💌', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              story,
-              style: GoogleFonts.nunito(
-                fontSize: 13,
-                color: Colors.white.withValues(alpha: 0.85),
-                height: 1.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Workspace strip ────────────────────────────────────────────────────────────
-
-class _WorkspaceStrip extends StatelessWidget {
-  final List<Flower> flowers;
-  final int maxFlowers;
-  final void Function(int) onRemove;
-
-  const _WorkspaceStrip({
-    required this.flowers,
-    required this.maxFlowers,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 80,
-      margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        children: [
-          // Slots
-          Expanded(
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              itemCount: maxFlowers,
-              itemBuilder: (_, i) {
-                if (i < flowers.length) {
-                  return GestureDetector(
-                    onTap: () => onRemove(i),
-                    child: Container(
-                      width: 56,
-                      margin: const EdgeInsets.only(right: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                  const SizedBox(height: 14),
+                  _card(
+                    AppColors.warmWhite,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('The three arrangements', style: _heading(17)),
+                        const SizedBox(height: 8),
+                        for (var i = 0; i < 3; i++)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  order.contributions[i].isSubmitted
+                                      ? Icons.check_circle_rounded
+                                      : Icons.circle_outlined,
+                                  color: AppColors.gardenGreenDark,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Arrangement ${i + 1}: ${order.contributions[i].isSubmitted
+                                        ? 'Delivered on Day ${order.contributions[i].gameDay}'
+                                        : i == order.nextDayIndex
+                                        ? 'Ready today'
+                                        : 'Waiting'}',
+                                    style: _body(bold: true),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Up to ${(order.dailyReward * 1.25).round()} coins each day • ${order.completionBonus} coin finish bonus',
+                          style: _body(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (_result != null)
+                    _card(
+                      const Color(0xFFDCEBC6),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          FlowerImage(flower: flowers[i], size: 28),
-                          const SizedBox(height: 2),
-                          const Text('✕',
-                              style: TextStyle(fontSize: 8, color: Colors.white54)),
+                          Text(switch (_result!) {
+                            ContributionResult.great =>
+                              'A gorgeous arrangement!',
+                            ContributionResult.good => 'Beautifully delivered!',
+                            ContributionResult.poor => 'Arrangement delivered',
+                            _ => 'Delivered',
+                          }, style: _heading(20)),
+                          const SizedBox(height: 6),
+                          Text(
+                            '+$_earned coins${order.isComplete ? ' • Commission complete!' : ''}',
+                            style: _body(bold: true),
+                          ),
+                        ],
+                      ),
+                    )
+                  else ...[
+                    _card(
+                      const Color(0xFFDCEBC6),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Today’s note', style: _heading(17)),
+                          const SizedBox(height: 5),
+                          Text(order.dayStories[storyIndex], style: _body()),
+                          const SizedBox(height: 9),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final vibe in order.requiredVibes)
+                                Chip(
+                                  label: Text(vibe.label),
+                                  backgroundColor: AppColors.warmWhite,
+                                  side: const BorderSide(
+                                    color: AppColors.cartoonInk,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
-                  );
-                }
-                return Container(
-                  width: 56,
-                  margin: const EdgeInsets.only(right: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.10)),
-                  ),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: Text(
-              '${flowers.length}/$maxFlowers',
-              style: GoogleFonts.nunito(
-                fontSize: 12,
-                color: Colors.white54,
-                fontWeight: FontWeight.w700,
+                    const SizedBox(height: 16),
+                    Text(
+                      'Your bouquet  ${_bouquet.length}/${order.minFlowers} minimum',
+                      style: _heading(18),
+                    ),
+                    if (_bouquet.isEmpty)
+                      SizedBox(
+                        height: 110,
+                        child: Center(
+                          child: Text(
+                            'Choose flowers from your shop below',
+                            style: _body(),
+                          ),
+                        ),
+                      )
+                    else
+                      Center(
+                        child: BouquetPreview(flowers: _bouquet, size: 155),
+                      ),
+                    if (_bouquet.isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () => setState(_bouquet.removeLast),
+                          icon: const Icon(Icons.undo_rounded),
+                          label: const Text('Undo last flower'),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    Text('Flowers in your shop', style: _heading(18)),
+                    const SizedBox(height: 8),
+                    if (available.isEmpty)
+                      Text(
+                        'No flowers in stock. Continue to the market to restock.',
+                        style: _body(),
+                      ),
+                    for (final flower in available)
+                      _flowerChoice(
+                        flower,
+                        state.inventory[flower.id] ?? 0,
+                        order.maxFlowers,
+                      ),
+                  ],
+                ],
               ),
             ),
-          ),
-        ],
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _result != null
+                        ? _leave
+                        : canSubmit
+                        ? _submit
+                        : null,
+                    icon: Icon(
+                      _result != null
+                          ? Icons.arrow_forward_rounded
+                          : Icons.local_florist_rounded,
+                      color: _result != null || canSubmit
+                          ? Colors.white
+                          : AppColors.brownDark,
+                    ),
+                    label: Text(
+                      _result != null ? 'Continue' : 'Send arrangement',
+                      style: TextStyle(
+                        color: _result != null || canSubmit
+                            ? Colors.white
+                            : AppColors.brownDark,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      backgroundColor: AppColors.gardenGreenDark,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
 
-// ── Flower picker ──────────────────────────────────────────────────────────────
-
-class _FlowerPicker extends StatelessWidget {
-  final Map<String, int> inventory;
-  final int day;
-  final void Function(String) onAdd;
-
-  const _FlowerPicker({
-    required this.inventory,
-    required this.day,
-    required this.onAdd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final available = unlockedFlowers(day)
-        .where((f) => (inventory[f.id] ?? 0) > 0)
-        .toList();
-
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: available.length,
-      itemBuilder: (_, i) {
-        final flower = available[i];
-        final qty = inventory[flower.id] ?? 0;
-        return GestureDetector(
-          onTap: () => onAdd(flower.id),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: Colors.white.withValues(alpha: 0.15)),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FlowerImage(flower: flower, size: 28),
-                const SizedBox(height: 3),
-                Text(
-                  flower.name,
-                  style: GoogleFonts.nunito(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white.withValues(alpha: 0.85),
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '×$qty',
-                  style: GoogleFonts.nunito(
-                    fontSize: 9,
-                    color: Colors.white54,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ── Submit bar ─────────────────────────────────────────────────────────────────
-
-class _SubmitBar extends StatelessWidget {
-  final bool canSubmit;
-  final int minFlowers;
-  final int current;
-  final VoidCallback onSubmit;
-
-  const _SubmitBar({
-    required this.canSubmit,
-    required this.minFlowers,
-    required this.current,
-    required this.onSubmit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _flowerChoice(Flower flower, int stock, int max) {
+    final selected = _bouquet.where((item) => item.id == flower.id).length;
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      margin: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF2A3D2A),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        color: AppColors.warmWhite,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: AppColors.cartoonInk, width: 1.3),
       ),
-      child: ElevatedButton.icon(
-        onPressed: canSubmit ? onSubmit : null,
-        icon: const Text('🎀', style: TextStyle(fontSize: 18)),
-        label: Text(
-          canSubmit
-              ? 'Submit Contribution'
-              : 'Need $minFlowers+ flowers ($current added)',
-          style: GoogleFonts.nunito(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          minimumSize: const Size(double.infinity, 52),
-          backgroundColor: canSubmit
-              ? AppColors.gardenGreenMid
-              : Colors.white12,
-          foregroundColor: Colors.white,
-          disabledForegroundColor: Colors.white30,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Result card ────────────────────────────────────────────────────────────────
-
-class _ResultCard extends StatelessWidget {
-  final ContributionResult result;
-  final VoidCallback onDone;
-
-  const _ResultCard({required this.result, required this.onDone});
-
-  @override
-  Widget build(BuildContext context) {
-    final (emoji, label, color) = switch (result) {
-      ContributionResult.great => ('🌟', 'Outstanding!', AppColors.sunflowerGold),
-      ContributionResult.good => ('✅', 'Well done!', AppColors.sageDark),
-      ContributionResult.poor => ('😔', 'Not quite…', AppColors.carnationCoral),
-      _ => ('⏳', 'Submitted', AppColors.brownLight),
-    };
-
-    return Expanded(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 64)),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            result == ContributionResult.poor
-                ? 'The vibes weren\'t quite right today.'
-                : 'Day\'s contribution delivered!',
-            style: GoogleFonts.nunito(
-              fontSize: 13,
-              color: Colors.white.withValues(alpha: 0.75),
-            ),
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: onDone,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.gardenGreenMid,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(180, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
+          FlowerImage(flower: flower, size: 35),
+          const SizedBox(width: 9),
+          Expanded(
             child: Text(
-              'Continue →',
-              style: GoogleFonts.nunito(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
+              '${flower.name}  •  ${stock - selected} left',
+              style: _body(bold: true),
             ),
+          ),
+          IconButton(
+            onPressed: selected < stock && _bouquet.length < max
+                ? () => _add(flower, stock, max)
+                : null,
+            tooltip: 'Add ${flower.name}',
+            icon: const Icon(Icons.add_circle_rounded),
+            color: AppColors.gardenGreenDark,
           ),
         ],
       ),
     );
   }
-}
 
-// ── Navigation helper ──────────────────────────────────────────────────────────
+  Widget _card(Color color, Widget child) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(19),
+      border: Border.all(color: AppColors.cartoonInk, width: 1.7),
+    ),
+    child: child,
+  );
+
+  TextStyle _heading(double size) => GoogleFonts.nunito(
+    fontSize: size,
+    fontWeight: FontWeight.w900,
+    color: AppColors.gardenGreenDark,
+  );
+  TextStyle _body({bool bold = false}) => GoogleFonts.nunito(
+    fontWeight: bold ? FontWeight.w900 : FontWeight.w700,
+    color: AppColors.brownDark,
+  );
+}
 
 Future<void> openBigOrderScreen(
   BuildContext context, {
   required VoidCallback onDone,
 }) {
-  if (!Features.bigOrders) return Future<void>.value();
+  final state = ProviderScope.containerOf(context).read(gameProvider);
+  if (!Features.bigOrders ||
+      !state.dayEnded ||
+      !(state.activeBigOrder?.canContributeOn(state.day) ?? false)) {
+    onDone();
+    return Future<void>.value();
+  }
   return Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => BigOrderScreen(onDone: () {
-          Navigator.of(context).pop();
-          onDone();
-        }),
-        transitionsBuilder: (_, anim, __, child) => SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 1),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
-          child: child,
-        ),
-      ),
-    );
+    MaterialPageRoute<void>(builder: (_) => BigOrderScreen(onDone: onDone)),
+  );
 }

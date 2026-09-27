@@ -1,5 +1,7 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Sound IDs used throughout the game.
 enum GameSound {
@@ -27,14 +29,14 @@ enum GameSound {
 
 extension _SoundPath on GameSound {
   String get assetPath => switch (this) {
-        GameSound.ambientShop => 'audio/ambient_shop.mp3',
-        GameSound.flowerDrop => 'audio/flower_drop.mp3',
-        GameSound.submit => 'audio/submit.mp3',
-        GameSound.greatOrder => 'audio/great_order.mp3',
-        GameSound.poorOrder => 'audio/poor_order.mp3',
-        GameSound.coin => 'audio/coin.mp3',
-        GameSound.notification => 'audio/notification.mp3',
-      };
+    GameSound.ambientShop => 'audio/ambient_shop.wav',
+    GameSound.flowerDrop => 'audio/flower_drop.wav',
+    GameSound.submit => 'audio/submit.wav',
+    GameSound.greatOrder => 'audio/great_order.wav',
+    GameSound.poorOrder => 'audio/poor_order.wav',
+    GameSound.coin => 'audio/coin.wav',
+    GameSound.notification => 'audio/notification.wav',
+  };
 }
 
 /// Singleton audio service. All playback is silently swallowed if the
@@ -47,18 +49,37 @@ class AudioService {
 
   // Small rotating pool so overlapping effects (e.g. submit + coin) don't
   // cut each other off mid-play.
-  final List<AudioPlayer> _sfxPool =
-      List.generate(3, (_) => AudioPlayer());
+  final List<AudioPlayer> _sfxPool = List.generate(3, (_) => AudioPlayer());
   int _nextSfx = 0;
+  Future<Set<String>>? _availableAssets;
+
+  Future<bool> _hasSound(GameSound sound) async {
+    _availableAssets ??= AssetManifest.loadFromAssetBundle(
+      rootBundle,
+    ).then((manifest) => manifest.listAssets().toSet());
+    return (await _availableAssets!).contains('assets/${sound.assetPath}');
+  }
 
   bool _muted = false;
+  bool _ambientStarted = false;
+  static const _mutePreferenceKey = 'sound_muted';
   bool get isMuted => _muted;
+
+  Future<void> loadPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _muted = prefs.getBool(_mutePreferenceKey) ?? false;
+    } catch (_) {
+      _muted = false;
+    }
+  }
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /// Play a one-shot sound effect.
   Future<void> play(GameSound sound) async {
     if (_muted || sound == GameSound.ambientShop) return;
+    if (!await _hasSound(sound)) return;
     final player = _sfxPool[_nextSfx];
     _nextSfx = (_nextSfx + 1) % _sfxPool.length;
     try {
@@ -71,16 +92,17 @@ class AudioService {
   /// Start the ambient background loop. Silently ignored if file is missing.
   Future<void> startAmbient() async {
     if (_muted) return;
+    if (!await _hasSound(GameSound.ambientShop)) return;
     try {
-      _ambientPlayer.setReleaseMode(ReleaseMode.loop);
-      await _ambientPlayer.play(
-        AssetSource(GameSound.ambientShop.assetPath),
-      );
+      await _ambientPlayer.setReleaseMode(ReleaseMode.loop);
+      await _ambientPlayer.play(AssetSource(GameSound.ambientShop.assetPath));
+      _ambientStarted = true;
     } catch (_) {}
   }
 
   /// Pause the ambient track (e.g. when opening a modal screen).
   Future<void> pauseAmbient() async {
+    if (!_ambientStarted) return;
     try {
       await _ambientPlayer.pause();
     } catch (_) {}
@@ -88,22 +110,31 @@ class AudioService {
 
   /// Resume the ambient track.
   Future<void> resumeAmbient() async {
-    if (_muted) return;
+    if (_muted || !_ambientStarted) return;
     try {
       await _ambientPlayer.resume();
     } catch (_) {}
   }
 
-  /// Toggle mute globally. Stops/resumes ambient accordingly.
-  Future<void> toggleMute() async {
-    _muted = !_muted;
+  /// Persist the player's sound choice and stop/resume the shop loop.
+  Future<void> setMuted(bool muted) async {
+    if (_muted == muted) return;
+    _muted = muted;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_mutePreferenceKey, muted);
+    } catch (_) {}
     if (_muted) {
       await pauseAmbient();
-    } else {
+    } else if (_ambientStarted) {
       await resumeAmbient();
+    } else {
+      await startAmbient();
     }
     debugPrint('AudioService: muted=$_muted');
   }
+
+  Future<void> toggleMute() => setMuted(!_muted);
 
   Future<void> dispose() async {
     await _ambientPlayer.dispose();

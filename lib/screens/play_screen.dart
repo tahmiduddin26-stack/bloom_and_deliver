@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../config/feature_flags.dart';
@@ -7,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../data/flower_data.dart';
 import '../data/level_data.dart';
+import '../data/delivery_data.dart';
 import '../models/bouquet_order.dart';
 import '../models/customer_profile.dart';
 import '../models/daily_challenge.dart';
@@ -16,7 +20,8 @@ import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/achievement_popup.dart';
-import '../widgets/ambient_petals.dart';
+import '../widgets/bouquet_preview.dart';
+import '../widgets/customer_avatar.dart';
 import '../widgets/end_of_day_dialog.dart';
 import '../widgets/flower_image.dart';
 import '../widgets/memory_popup.dart';
@@ -37,11 +42,46 @@ class PlayScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayScreenState extends ConsumerState<PlayScreen> {
+  Timer? _serviceTimer;
+  Duration _serviceTime = Duration.zero;
+  String? _serviceOrder;
+
+  @override
+  void initState() {
+    super.initState();
+    _serviceTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (!mounted ||
+          _resultShown != null ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+      final state = ref.read(gameProvider);
+      if (state.currentOrder == null) return;
+      final key = '${state.day}:${state.currentOrderIndex}';
+      setState(() {
+        if (_serviceOrder != key) {
+          _serviceOrder = key;
+          _serviceTime = Duration.zero;
+        } else {
+          _serviceTime += const Duration(milliseconds: 250);
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _serviceTimer?.cancel();
+    super.dispose();
+  }
+
   bool _showConfetti = false;
 
   // Transient result overlay
   OrderResult? _resultShown;
   int _resultEarned = 0;
+  List<Flower> _deliveredFlowers = const [];
 
   // Celebration popup queues (achievements, friendship memories)
   String? _activeAchievementId;
@@ -49,18 +89,27 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
 
   // Transient "challenge complete" celebration
   DailyChallenge? _challengeDone;
+  Future<void>? _rankUpDialogFuture;
 
   void _handleSubmit() {
+    if (_resultShown != null || !ref.read(gameProvider.notifier).canSubmit) {
+      return;
+    }
     HapticFeedback.mediumImpact();
     AudioService.instance.play(GameSound.submit);
 
     final beforeState = ref.read(gameProvider);
+    _deliveredFlowers = List.of(beforeState.bouquetWorkspace);
     final before = beforeState.money;
     final doneBefore = beforeState.dailyChallenges
         .where((c) => c.completed)
         .map((c) => c.id)
         .toSet();
-    final result = ref.read(gameProvider.notifier).submitBouquet();
+    final result = ref
+        .read(gameProvider.notifier)
+        .submitBouquet(serviceTime: _serviceTime);
+    _serviceTime = Duration.zero;
+    _serviceOrder = null;
     final afterState = ref.read(gameProvider);
     final earned = (afterState.money - before).clamp(0, 99999);
     final justCompleted = afterState.dailyChallenges
@@ -71,12 +120,14 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       result == OrderResult.great
           ? GameSound.greatOrder
           : result == OrderResult.poor
-              ? GameSound.poorOrder
-              : GameSound.coin,
+          ? GameSound.poorOrder
+          : GameSound.coin,
     );
     if (result == OrderResult.great) {
       Future.delayed(
-          const Duration(milliseconds: 150), HapticFeedback.heavyImpact);
+        const Duration(milliseconds: 150),
+        HapticFeedback.heavyImpact,
+      );
     }
 
     setState(() {
@@ -116,9 +167,35 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     );
   }
 
-  void _openDeliveries() => openDeliveryScreen(context, onDone: _openMarket);
+  void _openDeliveries({bool thenCommission = true}) => openDeliveryScreen(
+    context,
+    onDone: () {
+      if (!mounted) return;
+      final current = ref.read(gameProvider);
+      if (thenCommission &&
+          Features.bigOrders &&
+          (current.activeBigOrder?.canContributeOn(current.day) ?? false)) {
+        _openBigOrder(thenDeliveries: false);
+      } else {
+        _openMarket();
+      }
+    },
+  );
 
-  void _openBigOrder() => openBigOrderScreen(context, onDone: _openMarket);
+  void _openBigOrder({bool thenDeliveries = true}) => openBigOrderScreen(
+    context,
+    onDone: () {
+      if (!mounted) return;
+      final current = ref.read(gameProvider);
+      if (thenDeliveries &&
+          Features.deliveries &&
+          current.pendingDeliveries.any((mission) => !mission.isCompleted)) {
+        _openDeliveries(thenCommission: false);
+      } else {
+        _openMarket();
+      }
+    },
+  );
 
   void _onAchievementDismissed() {
     ref.read(gameProvider.notifier).popPendingAchievement();
@@ -142,13 +219,20 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     }
   }
 
-  void _showRankUpDialog(FloristRank newRank) {
+  void _queueRankUpDialog(FloristRank newRank) {
     ref.read(gameProvider.notifier).clearPendingRankUp();
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => _RankUpDialog(rank: newRank),
-    );
+    // Let the bouquet result finish before opening another full-screen reward.
+    _rankUpDialogFuture =
+        Future<void>.delayed(const Duration(milliseconds: 1500)).then((
+          _,
+        ) async {
+          if (!mounted) return;
+          await showDialog<void>(
+            context: context,
+            barrierDismissible: true,
+            builder: (_) => _RankUpDialog(rank: newRank),
+          );
+        });
   }
 
   @override
@@ -160,13 +244,18 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     // Day finished → summary, then deliveries / big order / market.
     ref.listen(gameProvider.select((s) => s.dayEnded), (prev, next) {
       if (next && prev == false) {
-        Future.delayed(const Duration(milliseconds: 1500), () {
+        Future.delayed(const Duration(milliseconds: 1550), () async {
+          if (!mounted) return;
+          if (_rankUpDialogFuture != null) await _rankUpDialogFuture;
           if (!mounted) return;
           showEndOfDayDialog(
             context, // ignore: use_build_context_synchronously
             onGoToMarket: _openMarket,
-            onGoToDeliveries: Features.deliveries ? _openDeliveries : null,
-            onGoToBigOrder: Features.bigOrders ? _openBigOrder : null,
+            onGoToDeliveries:
+                Features.deliveries && state.day >= deliveryUnlockDay
+                ? () => _openDeliveries()
+                : null,
+            onGoToBigOrder: Features.bigOrders ? () => _openBigOrder() : null,
           );
         });
       }
@@ -176,7 +265,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     ref.listen(gameProvider.select((s) => s.pendingRankUp), (prev, next) {
       if (next != null && next != prev) {
         AudioService.instance.play(GameSound.greatOrder);
-        _showRankUpDialog(next);
+        _queueRankUpDialog(next);
       }
     });
 
@@ -200,21 +289,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       body: SparkleOverlay(
         active: _showConfetti,
         child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFFFCE4EC),
-                Color(0xFFF8EDF3),
-                Color(0xFFE8F5E9),
-              ],
-            ),
-          ),
+          decoration: const BoxDecoration(color: Color(0xFFFFF2CF)),
           child: SafeArea(
             child: Stack(
               children: [
-                const Positioned.fill(child: AmbientPetals()),
                 Column(
                   children: [
                     _Header(
@@ -248,14 +326,46 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                       )
                     else
                       const Expanded(
-                        child: Center(child: Text('🌙', style: TextStyle(fontSize: 48))),
+                        child: Center(
+                          child: Text('🌙', style: TextStyle(fontSize: 48)),
+                        ),
                       ),
                     if (order != null) ...[
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: _BouquetArea(order: order),
+                      _ServiceMeter(
+                        seconds: ref.read(gameProvider.notifier).serviceSeconds,
+                        elapsed: _serviceTime,
+                        streak: ref.read(gameProvider.notifier).greatStreak,
+                        label: level.paceLabel,
                       ),
-                      _FlowerTray(day: state.day, inventory: state.inventory, order: order),
+                      const SizedBox(height: 8),
+                      Expanded(child: _BouquetArea(order: order)),
+                      if (ref.read(gameProvider.notifier).needsCommunityFlowers)
+                        TextButton.icon(
+                          onPressed: () => ref
+                              .read(gameProvider.notifier)
+                              .requestCommunityFlowers(),
+                          icon: const Icon(
+                            Icons.volunteer_activism_outlined,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Out of supplies? Collect free community flowers',
+                          ),
+                        )
+                      else
+                        TextButton.icon(
+                          onPressed: () => openMarketScreen(context),
+                          icon: const Icon(
+                            Icons.shopping_basket_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('Restock flowers'),
+                        ),
+                      _FlowerTray(
+                        day: state.day,
+                        inventory: state.inventory,
+                        order: order,
+                      ),
                       _SubmitBar(
                         order: order,
                         count: state.bouquetWorkspace.length,
@@ -266,7 +376,11 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                 ),
                 // Result overlay
                 if (_resultShown != null)
-                  _ResultOverlay(result: _resultShown!, earned: _resultEarned),
+                  _ResultOverlay(
+                    result: _resultShown!,
+                    earned: _resultEarned,
+                    bouquet: _deliveredFlowers,
+                  ),
                 // Achievement popup
                 if (_activeAchievementId != null)
                   Positioned(
@@ -308,6 +422,75 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
 
 // ── Rank-up dialog ─────────────────────────────────────────────────────────────
 
+class _ServiceMeter extends StatelessWidget {
+  final int seconds, streak;
+  final Duration elapsed;
+  final String label;
+  const _ServiceMeter({
+    required this.seconds,
+    required this.elapsed,
+    required this.streak,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = (seconds - elapsed.inSeconds).clamp(0, seconds);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 7, 16, 0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.timer_rounded,
+                size: 17,
+                color: AppColors.gardenGreen,
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  remaining > 0
+                      ? '$label · ${remaining}s for a quick tip'
+                      : 'Take your time · quick tip ended',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              if (streak > 0)
+                Text(
+                  'Streak $streak',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.roseRed,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: (1 - elapsed.inMilliseconds / (seconds * 1000)).clamp(
+                0,
+                1,
+              ),
+              minHeight: 6,
+              backgroundColor: const Color(0xFFE0D4AF),
+              color: remaining < 10
+                  ? AppColors.roseRed
+                  : const Color(0xFF73B95B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RankUpDialog extends StatelessWidget {
   final FloristRank rank;
 
@@ -341,7 +524,7 @@ class _RankUpDialog extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Rank Up!',
-              style: GoogleFonts.playfairDisplay(
+              style: GoogleFonts.nunito(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: AppColors.inkBrown,
@@ -422,8 +605,11 @@ class _Header extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.arrow_back_rounded,
-                  size: 22, color: Color(0xFF6D4C41)),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                size: 22,
+                color: Color(0xFF6D4C41),
+              ),
             ),
           ),
           const SizedBox(width: 10),
@@ -433,7 +619,7 @@ class _Header extends StatelessWidget {
               children: [
                 Text(
                   '${level.emoji} Level ${level.number} — ${level.title}',
-                  style: GoogleFonts.playfairDisplay(
+                  style: GoogleFonts.nunito(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: AppColors.inkBrown,
@@ -447,27 +633,27 @@ class _Header extends StatelessWidget {
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Row(
-                  children: List.generate(ordersTotal.clamp(0, 12), (i) {
-                    final done = i < ordersDone;
-                    final current = i == ordersDone;
-                    return Container(
-                      width: current ? 10 : 7,
-                      height: current ? 10 : 7,
-                      margin: const EdgeInsets.only(right: 4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: done
-                            ? const Color(0xFFEC407A)
-                            : current
-                                ? const Color(0xFFF48FB1)
-                                : Colors.white.withValues(alpha: 0.9),
-                        border: Border.all(
-                          color: const Color(0xFFF48FB1),
-                          width: 1.2,
+                    children: List.generate(ordersTotal.clamp(0, 12), (i) {
+                      final done = i < ordersDone;
+                      final current = i == ordersDone;
+                      return Container(
+                        width: current ? 10 : 7,
+                        height: current ? 10 : 7,
+                        margin: const EdgeInsets.only(right: 4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: done
+                              ? const Color(0xFFEC407A)
+                              : current
+                              ? const Color(0xFFF48FB1)
+                              : Colors.white.withValues(alpha: 0.9),
+                          border: Border.all(
+                            color: const Color(0xFFF48FB1),
+                            width: 1.2,
+                          ),
                         ),
-                      ),
-                    );
-                  }),
+                      );
+                    }),
                   ),
                 ),
               ],
@@ -531,7 +717,8 @@ class _CustomerCard extends StatelessWidget {
     final maxF = customer.maxFriendship;
     // A maxed-out regular unlocks their life-event moment — the emotional payoff
     // of the relationship, and the reason to keep serving them.
-    final showLifeEvent = customer.isRegular &&
+    final showLifeEvent =
+        customer.isRegular &&
         friendship >= maxF &&
         customer.lifeEventHint != null;
 
@@ -539,12 +726,13 @@ class _CustomerCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
+        color: const Color(0xFFFFFEF6),
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.gardenGreenDark, width: 2.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFF48FB1).withValues(alpha: 0.35),
-            blurRadius: 14,
+            color: const Color(0xFFD6BF8D),
+            blurRadius: 0,
             offset: const Offset(0, 4),
           ),
         ],
@@ -556,19 +744,7 @@ class _CustomerCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Avatar
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFFCE4EC),
-                  border: Border.all(color: const Color(0xFFF48FB1), width: 2),
-                ),
-                child: Center(
-                  child: Text(order.customer.portrait,
-                      style: const TextStyle(fontSize: 24)),
-                ),
-              ),
+              CustomerAvatar(name: order.customer.name),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -602,7 +778,7 @@ class _CustomerCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       order.hint,
-                      maxLines: 3,
+                      maxLines: MediaQuery.sizeOf(context).height < 700 ? 2 : 3,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.nunito(
                         fontSize: 12.5,
@@ -757,12 +933,17 @@ class _MatchChipState extends State<_MatchChip>
 
   late final Animation<double> _scale = TweenSequence<double>([
     TweenSequenceItem(
-      tween: Tween(begin: 1.0, end: 1.28).chain(CurveTween(curve: Curves.easeOut)),
+      tween: Tween(
+        begin: 1.0,
+        end: 1.28,
+      ).chain(CurveTween(curve: Curves.easeOut)),
       weight: 35,
     ),
     TweenSequenceItem(
-      tween: Tween(begin: 1.28, end: 1.0)
-          .chain(CurveTween(curve: Curves.elasticOut)),
+      tween: Tween(
+        begin: 1.28,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.elasticOut)),
       weight: 65,
     ),
   ]).animate(_pop);
@@ -797,7 +978,12 @@ class _MatchChipState extends State<_MatchChip>
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: vibe.color, width: 1.5),
           boxShadow: covered
-              ? [BoxShadow(color: vibe.color.withValues(alpha: 0.5), blurRadius: 8)]
+              ? [
+                  BoxShadow(
+                    color: vibe.color.withValues(alpha: 0.5),
+                    blurRadius: 8,
+                  ),
+                ]
               : [],
         ),
         child: Text(
@@ -866,10 +1052,14 @@ class _BouquetArea extends ConsumerWidget {
                     const Spacer(),
                     if (workspace.isNotEmpty) ...[
                       _SmallAction(
-                          label: '↩️ Undo', onTap: notifier.undoLastFlower),
+                        label: '↩️ Undo',
+                        onTap: notifier.undoLastFlower,
+                      ),
                       const SizedBox(width: 6),
                       _SmallAction(
-                          label: '🗑 Clear', onTap: notifier.clearWorkspace),
+                        label: '🗑 Clear',
+                        onTap: notifier.clearWorkspace,
+                      ),
                     ],
                   ],
                 ),
@@ -887,21 +1077,41 @@ class _BouquetArea extends ConsumerWidget {
                           ),
                         ),
                       )
-                    : Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (var i = 0; i < workspace.length; i++)
-                              _BouquetFlower(
-                                flower: workspace[i],
-                                onTap: () =>
-                                    notifier.removeFlowerFromWorkspace(i),
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final previewSize = math
+                              .min(
+                                constraints.maxWidth * 0.76,
+                                constraints.maxHeight - 52,
+                              )
+                              .clamp(0.0, 210.0);
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              BouquetPreview(
+                                flowers: workspace,
+                                size: previewSize,
                               ),
-                          ],
-                        ),
+                              SizedBox(
+                                height: 46,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  itemCount: workspace.length,
+                                  separatorBuilder: (_, _) =>
+                                      const SizedBox(width: 5),
+                                  itemBuilder: (context, i) => _BouquetFlower(
+                                    flower: workspace[i],
+                                    onTap: () =>
+                                        notifier.removeFlowerFromWorkspace(i),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
               ),
             ],
@@ -920,25 +1130,24 @@ class _SmallAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-                color: AppColors.brownLight.withValues(alpha: 0.4)),
-          ),
-          child: Text(
-            label,
-            style: GoogleFonts.nunito(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: AppColors.brownDark,
-            ),
-          ),
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.brownLight.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.nunito(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: AppColors.brownDark,
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _BouquetFlower extends StatefulWidget {
@@ -975,13 +1184,15 @@ class _BouquetFlowerState extends State<_BouquetFlower>
           widget.onTap();
         },
         child: Container(
-          width: 56,
-          height: 56,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: widget.flower.color.withValues(alpha: 0.18),
             border: Border.all(
-                color: widget.flower.color.withValues(alpha: 0.8), width: 2.5),
+              color: widget.flower.color.withValues(alpha: 0.8),
+              width: 2.5,
+            ),
             boxShadow: [
               BoxShadow(
                 color: widget.flower.color.withValues(alpha: 0.35),
@@ -989,7 +1200,7 @@ class _BouquetFlowerState extends State<_BouquetFlower>
               ),
             ],
           ),
-          child: Center(child: FlowerImage(flower: widget.flower, size: 32)),
+          child: Center(child: FlowerImage(flower: widget.flower, size: 27)),
         ),
       ),
     );
@@ -1013,8 +1224,7 @@ class _FlowerTray extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(gameProvider.notifier);
     final flowers = unlockedFlowers(day);
-    final wanted =
-        order.isMystery ? <VibeTag>{} : order.requiredVibes.toSet();
+    final wanted = order.isMystery ? <VibeTag>{} : order.requiredVibes.toSet();
 
     // In-stock first, matching flowers before the rest.
     final sorted = List<Flower>.from(flowers)
@@ -1034,7 +1244,7 @@ class _FlowerTray extends ConsumerWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: sorted.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final flower = sorted[i];
           final qty = inventory[flower.id] ?? 0;
@@ -1269,7 +1479,10 @@ class _ChallengeToast extends StatelessWidget {
       curve: Curves.easeOutBack,
       builder: (_, t, child) => Opacity(
         opacity: t.clamp(0.0, 1.0),
-        child: Transform.translate(offset: Offset(0, (1 - t) * 16), child: child),
+        child: Transform.translate(
+          offset: Offset(0, (1 - t) * 16),
+          child: child,
+        ),
       ),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -1337,8 +1550,13 @@ class _ChallengeToast extends StatelessWidget {
 class _ResultOverlay extends StatelessWidget {
   final OrderResult result;
   final int earned;
+  final List<Flower> bouquet;
 
-  const _ResultOverlay({required this.result, required this.earned});
+  const _ResultOverlay({
+    required this.result,
+    required this.earned,
+    required this.bouquet,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1359,8 +1577,7 @@ class _ResultOverlay extends StatelessWidget {
             builder: (_, scale, child) =>
                 Transform.scale(scale: scale, child: child),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 30, vertical: 22),
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 22),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.96),
                 borderRadius: BorderRadius.circular(26),
@@ -1376,10 +1593,10 @@ class _ResultOverlay extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(emoji, style: const TextStyle(fontSize: 52)),
+                  BouquetPreview(flowers: bouquet, size: 105),
                   Text(
                     text,
-                    style: GoogleFonts.playfairDisplay(
+                    style: GoogleFonts.nunito(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: AppColors.inkBrown,

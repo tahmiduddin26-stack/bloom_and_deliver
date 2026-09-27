@@ -72,15 +72,15 @@ class VibeNotebookScreen extends ConsumerWidget {
     final found = discovered.length;
 
     return Scaffold(
-      backgroundColor: AppColors.parchment,
+      backgroundColor: AppColors.cream,
       appBar: AppBar(
-        backgroundColor: AppColors.brownDark,
+        backgroundColor: AppColors.gardenGreenDark,
         foregroundColor: AppColors.warmWhite,
         title: Text(
-          '📓  Vibe Notebook',
-          style: GoogleFonts.playfairDisplay(
+          'Flower Notebook',
+          style: GoogleFonts.nunito(
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w900,
             color: AppColors.warmWhite,
           ),
         ),
@@ -107,10 +107,12 @@ class VibeNotebookScreen extends ConsumerWidget {
                 crossAxisSpacing: 10,
                 childAspectRatio: 1.1,
                 children: chapter.vibes
-                    .map((v) => _VibeCard(
-                          vibe: v,
-                          isDiscovered: discovered.contains(v.name),
-                        ))
+                    .map(
+                      (v) => _VibeCard(
+                        vibe: v,
+                        isDiscovered: discovered.contains(v.name),
+                      ),
+                    )
                     .toList(),
               ),
             ),
@@ -118,9 +120,7 @@ class VibeNotebookScreen extends ConsumerWidget {
 
           // ── Completion bonus note ─────────────────────────────────────────────
           if (found == total)
-            const SliverToBoxAdapter(
-              child: _CompletionBanner(),
-            ),
+            const SliverToBoxAdapter(child: _CompletionBanner()),
 
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
@@ -146,11 +146,11 @@ class _ProgressHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.warmWhite,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.brownLight.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.cartoonInk, width: 2),
         boxShadow: [
           BoxShadow(
             color: AppColors.brownDark.withValues(alpha: 0.06),
-            blurRadius: 8,
+            blurRadius: 0,
           ),
         ],
       ),
@@ -162,9 +162,9 @@ class _ProgressHeader extends StatelessWidget {
             children: [
               Text(
                 'Vibes Discovered',
-                style: GoogleFonts.playfairDisplay(
+                style: GoogleFonts.nunito(
                   fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w900,
                   color: AppColors.inkBrown,
                 ),
               ),
@@ -185,8 +185,9 @@ class _ProgressHeader extends StatelessWidget {
               value: pct,
               minHeight: 10,
               backgroundColor: AppColors.cream,
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(AppColors.sageDark),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                AppColors.sageDark,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -211,15 +212,13 @@ class _ChapterHeader extends StatelessWidget {
   final _Chapter chapter;
   final Set<String> discovered;
 
-  const _ChapterHeader({
-    required this.chapter,
-    required this.discovered,
-  });
+  const _ChapterHeader({required this.chapter, required this.discovered});
 
   @override
   Widget build(BuildContext context) {
-    final chapterFound =
-        chapter.vibes.where((v) => discovered.contains(v.name)).length;
+    final chapterFound = chapter.vibes
+        .where((v) => discovered.contains(v.name))
+        .length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
       child: Row(
@@ -229,9 +228,9 @@ class _ChapterHeader extends StatelessWidget {
           Expanded(
             child: Text(
               chapter.title,
-              style: GoogleFonts.playfairDisplay(
+              style: GoogleFonts.nunito(
                 fontSize: 16,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w900,
                 color: AppColors.inkBrown,
               ),
             ),
@@ -260,45 +259,36 @@ class _VibeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final col = isDiscovered ? vibe.color : AppColors.cream;
-    final textCol =
-        isDiscovered ? Colors.white : AppColors.brownLight.withValues(alpha: 0.4);
+    final col = isDiscovered
+        ? Color.lerp(vibe.color, AppColors.warmWhite, .6)!
+        : AppColors.warmWhite;
+    const textCol = AppColors.cartoonInk;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       decoration: BoxDecoration(
-        color: isDiscovered
-            ? col.withValues(alpha: 0.85)
-            : AppColors.warmWhite,
+        color: col,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDiscovered
-              ? col.withValues(alpha: 0.6)
-              : AppColors.cream,
-          width: isDiscovered ? 1.5 : 1,
-        ),
-        boxShadow: isDiscovered
-            ? [
-                BoxShadow(
-                  color: col.withValues(alpha: 0.25),
-                  blurRadius: 8,
-                  spreadRadius: 1,
-                )
-              ]
-            : null,
+        border: Border.all(color: AppColors.cartoonInk, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xFFD7C8A0),
+            blurRadius: 0,
+            offset: Offset(2, 3),
+          ),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (isDiscovered)
-            Text(
-              _vibeEmoji(vibe),
-              style: const TextStyle(fontSize: 22),
-            )
+            Text(_vibeEmoji(vibe), style: const TextStyle(fontSize: 22))
           else
-            Icon(Icons.lock_outline_rounded,
-                size: 22,
-                color: AppColors.brownLight.withValues(alpha: 0.25)),
+            Icon(
+              Icons.lock_outline_rounded,
+              size: 22,
+              color: AppColors.brownLight.withValues(alpha: 0.25),
+            ),
           const SizedBox(height: 4),
           Text(
             isDiscovered ? vibe.label : '???',
@@ -315,25 +305,25 @@ class _VibeCard extends StatelessWidget {
   }
 
   String _vibeEmoji(VibeTag v) => switch (v) {
-        VibeTag.romantic => '💕',
-        VibeTag.soft => '🩷',
-        VibeTag.delicate => '🌸',
-        VibeTag.sympathy => '🕊️',
-        VibeTag.cozy => '☕',
-        VibeTag.elegant => '🪷',
-        VibeTag.cheerful => '🌻',
-        VibeTag.vibrant => '🎆',
-        VibeTag.bold => '🔥',
-        VibeTag.wild => '🌿',
-        VibeTag.fresh => '💧',
-        VibeTag.natural => '🍃',
-        VibeTag.mystical => '🌙',
-        VibeTag.luxurious => '✨',
-        VibeTag.exotic => '🦜',
-        VibeTag.festive => '🎊',
-        VibeTag.rustic => '🍂',
-        VibeTag.traditional => '🏵️',
-      };
+    VibeTag.romantic => '💕',
+    VibeTag.soft => '🩷',
+    VibeTag.delicate => '🌸',
+    VibeTag.sympathy => '🕊️',
+    VibeTag.cozy => '☕',
+    VibeTag.elegant => '🪷',
+    VibeTag.cheerful => '🌻',
+    VibeTag.vibrant => '🎆',
+    VibeTag.bold => '🔥',
+    VibeTag.wild => '🌿',
+    VibeTag.fresh => '💧',
+    VibeTag.natural => '🍃',
+    VibeTag.mystical => '🌙',
+    VibeTag.luxurious => '✨',
+    VibeTag.exotic => '🦜',
+    VibeTag.festive => '🎊',
+    VibeTag.rustic => '🍂',
+    VibeTag.traditional => '🏵️',
+  };
 }
 
 // ── Completion banner ──────────────────────────────────────────────────────────
@@ -347,14 +337,13 @@ class _CompletionBanner extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2A5C3A), Color(0xFF1A3A25)],
-        ),
+        color: AppColors.gardenGreenDark,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cartoonInk, width: 2),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF2A5C3A).withValues(alpha: 0.35),
-            blurRadius: 16,
+            blurRadius: 0,
           ),
         ],
       ),
@@ -368,9 +357,9 @@ class _CompletionBanner extends StatelessWidget {
               children: [
                 Text(
                   'Vibe Master!',
-                  style: GoogleFonts.playfairDisplay(
+                  style: GoogleFonts.nunito(
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w900,
                     color: Colors.white,
                   ),
                 ),
@@ -397,8 +386,8 @@ void openVibeNotebook(BuildContext context) {
   if (!Features.vibeNotebook) return;
   Navigator.of(context).push(
     PageRouteBuilder(
-      pageBuilder: (_, __, ___) => const VibeNotebookScreen(),
-      transitionsBuilder: (_, animation, __, child) {
+      pageBuilder: (_, _, _) => const VibeNotebookScreen(),
+      transitionsBuilder: (_, animation, _, child) {
         return SlideTransition(
           position: Tween<Offset>(
             begin: const Offset(1, 0),
